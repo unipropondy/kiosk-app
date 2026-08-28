@@ -284,7 +284,7 @@ function formatKOTThermalText(data, itemsForPrinter, type) {
   }
 
   text += `[L]Order By: ${waiter}\n`;
-  text += `[L]Order #: ${orderNo}\n`;
+  text += `[L]Order #: <font size='big'><B>${orderNo}</B></font>\n`;
 
   if (kitchenName && kitchenName !== "KDS") {
     text += "[L]--------------------------------\n";

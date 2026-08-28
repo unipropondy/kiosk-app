@@ -340,7 +340,10 @@ function generateKOTHTML(data, type) {
     <div class="table-info"><span>Takeaway: ${tableNo}</span></div>
     <div class="headers"><div class="qty-head">Qty</div><div>Item</div></div>
     <div class="item-list">${itemListHTML}</div>
-    <div class="footer">Order By : ${waiter} #OR-${orderNo}</div>
+    <div class="footer">
+      <div>Order By : ${waiter}</div>
+      <div style="margin-top:6px;">Order #: <span style="font-size:32px; font-weight:900; line-height:1;">${orderNo}</span></div>
+    </div>
     ${kitchenName && kitchenName !== "KDS"
       ? `<div class="kitchen-name">${kitchenName}</div>`
       : ""
@@ -457,7 +460,7 @@ function formatKOTThermalText(data, type) {
   }
 
   text += `[L]Order By: ${waiter}\n`;
-  text += `[L]Order #: ${orderNo}\n`;
+  text += `[L]Order #: <font size='big'><B>${orderNo}</B></font>\n`;
 
   if (kitchenName && kitchenName !== "KDS") {
     text += "[L]--------------------------------\n";
