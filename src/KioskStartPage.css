@@ -1,0 +1,335 @@
+/* src/KioskStartPage.css */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
+
+/* ── Full Page Container ── */
+.start-page-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  background-image: url('./start_page_bg.jpg');
+  background-size: cover;
+  background-position: center left;
+  font-family: 'Inter', sans-serif;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Semi-transparent overlay to brighten/whiten the right side */
+.start-page-container::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to right, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.75) 30%, rgba(255,255,255,0.92) 100%);
+  z-index: 0;
+}
+
+/* All children sit above the overlay */
+.start-page-container > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Top Header ── */
+.start-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 36px;
+  background: transparent;
+}
+
+.sp-logo-area {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sp-logo-text h2 {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #f97316;
+  margin: 0;
+  line-height: 1.1;
+}
+
+.sp-logo-text p {
+  font-size: 0.8rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+.sp-lang-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: white;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 32px;
+  padding: 10px 20px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #374151;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+/* ── Main Content ── */
+.start-page-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+}
+
+/* ── Hero Text ── */
+.sp-hero-text {
+  text-align: center;
+}
+
+.sp-hero-text h1 {
+  font-size: 6.5rem;
+  font-weight: 900;
+  color: #111827;
+  margin: 0;
+  line-height: 1;
+  letter-spacing: 4px;
+}
+
+.sp-hero-highlight {
+  color: #f97316 !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+}
+
+.sp-spark {
+  display: inline-block;
+  width: 40px;
+  height: 3px;
+  background: #f97316;
+  border-radius: 4px;
+  position: relative;
+}
+
+.sp-spark::before,
+.sp-spark::after {
+  content: '';
+  position: absolute;
+  background: #f97316;
+  border-radius: 4px;
+}
+
+/* Left spark decorations */
+.sp-spark.left::before {
+  width: 3px;
+  height: 20px;
+  top: -8px;
+  right: -8px;
+}
+
+.sp-spark.left::after {
+  width: 3px;
+  height: 14px;
+  bottom: -6px;
+  right: -16px;
+}
+
+/* Right spark decorations */
+.sp-spark.right::before {
+  width: 3px;
+  height: 20px;
+  top: -8px;
+  left: -8px;
+}
+
+.sp-spark.right::after {
+  width: 3px;
+  height: 14px;
+  bottom: -6px;
+  left: -16px;
+}
+
+.sp-hero-text p {
+  font-size: 1.25rem;
+  color: #6b7280;
+  margin: 14px 0 0 0;
+  font-weight: 500;
+  letter-spacing: 1px;
+}
+
+/* ── Cards Container ── */
+.sp-cards-container {
+  display: flex;
+  gap: 28px;
+  justify-content: center;
+}
+
+/* ── Individual Card ── */
+.sp-card {
+  background: rgba(255, 255, 255, 0.88);
+  border: 1.5px solid rgba(249, 115, 22, 0.18);
+  border-radius: 28px;
+  width: 230px;
+  padding: 36px 24px 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.sp-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 16px 40px rgba(249, 115, 22, 0.18);
+}
+
+.sp-card:active {
+  transform: scale(0.97);
+}
+
+.sp-card-icon-wrap {
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  border: 2px solid #f97316;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff5eb;
+}
+
+.sp-card-icon-wrap svg {
+  width: 48px;
+  height: 48px;
+  color: #374151;
+  stroke: #374151;
+}
+
+.sp-card h3 {
+  font-size: 1.8rem;
+  font-weight: 900;
+  color: #111827;
+  margin: 0;
+  letter-spacing: 1px;
+}
+
+.sp-card p {
+  font-size: 0.95rem;
+  color: #6b7280;
+  text-align: center;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* The orange underline below title */
+.sp-card h3::after {
+  content: '';
+  display: block;
+  width: 32px;
+  height: 3px;
+  background: #f97316;
+  border-radius: 4px;
+  margin: 6px auto 0;
+}
+
+.sp-card-btn {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #f97316;
+  color: white;
+  font-size: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(249,115,22,0.35);
+  margin-top: 4px;
+  transition: background 0.15s;
+}
+
+.sp-card:hover .sp-card-btn {
+  background: #ea6a00;
+}
+
+/* ── Footer ── */
+.start-page-footer {
+  background: #f97316;
+  padding: 18px 36px;
+  border-radius: 40px 40px 0 0;
+  text-align: center;
+}
+
+.sp-footer-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: white;
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  animation: pulse-footer 2s ease-in-out infinite;
+}
+
+@keyframes pulse-footer {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.75; }
+}
+
+/* ── Loading Overlay ── */
+.sp-loading-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(255,255,255,0.8);
+  backdrop-filter: blur(10px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.sp-spinner {
+  width: 60px;
+  height: 60px;
+  border: 6px solid rgba(249,115,22,0.2);
+  border-top-color: #f97316;
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+  margin-bottom: 20px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.sp-loading-text {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #374151;
+}
+
+/* ── Error ── */
+.sp-error {
+  position: absolute;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #ef4444;
+  color: white;
+  padding: 14px 30px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 1.1rem;
+  box-shadow: 0 4px 16px rgba(239,68,68,0.3);
+  z-index: 10;
+  white-space: nowrap;
+}
