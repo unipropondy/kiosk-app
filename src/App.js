@@ -960,7 +960,7 @@ function App() {
     console.log("POS Order ID:", currentOrderId);
     // Pass the real POS orderId as posOrderId so we can use it on success
     // (YeahPay generates its own orderId which does NOT match our DB OrderNumber)
-    const demoUrl = `https://yeahpay-demo-production.up.railway.app?amount=${totalAmount}&orderId=${currentOrderId}&posOrderId=${encodeURIComponent(currentOrderId)}&from=pos`;
+    const demoUrl = `https://yeahpay-demo-production-9437.up.railway.app?amount=${totalAmount}&orderId=${currentOrderId}&posOrderId=${encodeURIComponent(currentOrderId)}&from=pos`;
 
     const paymentWindow = window.open(demoUrl, '_blank', 'width=500,height=700');
 
@@ -1677,7 +1677,7 @@ function App() {
   const WechatBrand = () => (
     <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#1AAD19', fontSize: '12px', fontWeight: 'bold' }}>
       <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M8.5 13.5c-3.5 0-6.3-2.3-6.3-5.2 0-2.9 2.8-5.2 6.3-5.2 3.5 0 6.3 2.3 6.3 5.2 0 2.9-2.8 5.2-6.3 5.2-.6 0-1.1-.1-1.6-.2l-2.1 1.1.5-1.9c-1.7-1-2.9-2.5-2.9-4.2zm6.7-1.1c.3.1.6.1.8.1 2.5 0 4.5-1.7 4.5-3.8 0-2.1-2-3.8-4.5-3.8-.2 0-.4 0-.6.1-.1-1.3-.8-2.5-1.9-3.3 1.1-.5 2.4-.8 3.7-.8 4.2 0 7.6 2.8 7.6 6.3 0 3.5-3.4 6.3-7.6 6.3-.7 0-1.4-.1-2.1-.3l-2.5 1.3.6-2.2c-2.1-1.2-3.5-3-3.5-5.1 0-1 .3-2 .8-2.9 1.3 1.3 3 2.3 4.7 3.1z"/>
+        <path d="M8.5 13.5c-3.5 0-6.3-2.3-6.3-5.2 0-2.9 2.8-5.2 6.3-5.2 3.5 0 6.3 2.3 6.3 5.2 0 2.9-2.8 5.2-6.3 5.2-.6 0-1.1-.1-1.6-.2l-2.1 1.1.5-1.9c-1.7-1-2.9-2.5-2.9-4.2zm6.7-1.1c.3.1.6.1.8.1 2.5 0 4.5-1.7 4.5-3.8 0-2.1-2-3.8-4.5-3.8-.2 0-.4 0-.6.1-.1-1.3-.8-2.5-1.9-3.3 1.1-.5 2.4-.8 3.7-.8 4.2 0 7.6 2.8 7.6 6.3 0 3.5-3.4 6.3-7.6 6.3-.7 0-1.4-.1-2.1-.3l-2.5 1.3.6-2.2c-2.1-1.2-3.5-3-3.5-5.1 0-1 .3-2 .8-2.9 1.3 1.3 3 2.3 4.7 3.1z" />
       </svg>
       WeChat Pay
     </div>
@@ -1686,8 +1686,8 @@ function App() {
   const EzlinkBrand = () => (
     <div style={{ display: 'flex', alignItems: 'center', gap: '2px', color: '#004B87', fontWeight: 'bold', fontSize: '14px', fontStyle: 'italic' }}>
       <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-        <circle cx="12" cy="12" r="10" fill="#004B87"/>
-        <path d="M8 8h8v2H10v2h5v2h-5v2h8v2H8V8z" fill="#fff"/>
+        <circle cx="12" cy="12" r="10" fill="#004B87" />
+        <path d="M8 8h8v2H10v2h5v2h-5v2h8v2H8V8z" fill="#fff" />
       </svg>
       ezlink
     </div>
@@ -1937,36 +1937,37 @@ function App() {
                   <div className="sidebar-cat-list">
                     {(Array.isArray(categories) ? categories : []).map((cat) => {
                       return (
-                      <button
-                        key={cat.CategoryId}
-                        className={`sidebar-cat-item ${activeCategory === cat.CategoryId ? "active" : ""}`}
-                        onClick={() => {
-                          setActiveCategory(cat.CategoryId);
-                          loadGroups(cat.CategoryId);
-                        }}
-                      >
-                        <div className="cat-indicator"></div>
-                        <div className="cat-image-container">
-                          {cat.ImagePath
-                            ? <img src={cat.ImagePath} alt={cat.KitchenTypeName} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                            : getFallbackIcon(cat.KitchenTypeName)
-                          }
-                        </div>
-                        <div className="cat-info">
-                          <span className="cat-item-name">{cat.KitchenTypeName}</span>
-                          <div className="cat-decorative-lines">
-                            <span className="line-solid"></span>
-                            <span className="line-dashed-dot"></span>
-                            <span className="line-dashed-dot"></span>
+                        <button
+                          key={cat.CategoryId}
+                          className={`sidebar-cat-item ${activeCategory === cat.CategoryId ? "active" : ""}`}
+                          onClick={() => {
+                            setActiveCategory(cat.CategoryId);
+                            loadGroups(cat.CategoryId);
+                          }}
+                        >
+                          <div className="cat-indicator"></div>
+                          <div className="cat-image-container">
+                            {cat.ImagePath
+                              ? <img src={cat.ImagePath} alt={cat.KitchenTypeName} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                              : getFallbackIcon(cat.KitchenTypeName)
+                            }
                           </div>
-                        </div>
-                        <div className="cat-arrow">
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="9 18 15 12 9 6" />
-                          </svg>
-                        </div>
-                      </button>
-                    )})}
+                          <div className="cat-info">
+                            <span className="cat-item-name">{cat.KitchenTypeName}</span>
+                            <div className="cat-decorative-lines">
+                              <span className="line-solid"></span>
+                              <span className="line-dashed-dot"></span>
+                              <span className="line-dashed-dot"></span>
+                            </div>
+                          </div>
+                          <div className="cat-arrow">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="9 18 15 12 9 6" />
+                            </svg>
+                          </div>
+                        </button>
+                      )
+                    })}
                     {/* ADD LOGOUT BUTTON HERE */}
                     <div className="sidebar-logout">
                       <button
@@ -2331,7 +2332,7 @@ function App() {
                       <img src={`${API}/image/${selectedDish.Image}`} alt={selectedDish.Name || selectedDish.name} />
                     ) : (
                       <div className="combo-placeholder-img">
-                        <span style={{fontSize: '48px'}}>🍔</span>
+                        <span style={{ fontSize: '48px' }}>🍔</span>
                       </div>
                     )}
                   </div>
@@ -2385,8 +2386,8 @@ function App() {
                                       <div className="option-row-info">
                                         <div className="option-name" style={{ color: '#111827' }}>{option.name}</div>
                                         <div className="option-price" style={{ color: '#6b7280' }}>
-                                          {((Number(option.surcharge) || 0) + (Number(option.dishPrice) || 0)) > 0 
-                                            ? `+$${((Number(option.surcharge) || 0) + (Number(option.dishPrice) || 0)).toFixed(2)}` 
+                                          {((Number(option.surcharge) || 0) + (Number(option.dishPrice) || 0)) > 0
+                                            ? `+$${((Number(option.surcharge) || 0) + (Number(option.dishPrice) || 0)).toFixed(2)}`
                                             : '$0.00'}
                                         </div>
                                       </div>
@@ -2430,7 +2431,7 @@ function App() {
                             </div>
                           </div>
                         )}
-                        
+
                         {comboError && (
                           <div className="combo-inline-error">{comboError}</div>
                         )}
@@ -2441,18 +2442,18 @@ function App() {
 
                 <div className="combo-fixed-bottom-bar">
                   <div className="combo-qty-controls">
-                    <button 
-                      className="combo-qty-btn" 
+                    <button
+                      className="combo-qty-btn"
                       onClick={() => setComboQty(Math.max(1, comboQty - 1))}
                     >-</button>
                     <span className="combo-qty-val">{comboQty}</span>
-                    <button 
-                      className="combo-qty-btn" 
+                    <button
+                      className="combo-qty-btn"
                       onClick={() => setComboQty(comboQty + 1)}
                     >+</button>
                   </div>
-                  <button 
-                    className="combo-add-btn" 
+                  <button
+                    className="combo-add-btn"
                     onClick={handleAddComboToCart}
                     style={{ background: themeColor }}
                   >
@@ -2475,7 +2476,7 @@ function App() {
                       <img src={`${API}/image/${selectedDish.Image}`} alt={selectedDish.Name || selectedDish.name} />
                     ) : (
                       <div className="combo-placeholder-img">
-                        <span style={{fontSize: '48px'}}>🍔</span>
+                        <span style={{ fontSize: '48px' }}>🍔</span>
                       </div>
                     )}
                   </div>
@@ -2493,7 +2494,7 @@ function App() {
                       <div className="group-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#1f2937' }}>Modifiers</h3>
                       </div>
-                      
+
                       <div className="options-grid-2col">
                         {modifiers.map((m) => {
                           const isSelected = selectedModifierIds.includes(m.ModifierID);
@@ -2552,18 +2553,18 @@ function App() {
 
                 <div className="combo-fixed-bottom-bar">
                   <div className="combo-qty-controls">
-                    <button 
-                      className="combo-qty-btn" 
+                    <button
+                      className="combo-qty-btn"
                       onClick={() => setComboQty(Math.max(1, comboQty - 1))}
                     >-</button>
                     <span className="combo-qty-val">{comboQty}</span>
-                    <button 
-                      className="combo-qty-btn" 
+                    <button
+                      className="combo-qty-btn"
                       onClick={() => setComboQty(comboQty + 1)}
                     >+</button>
                   </div>
-                  <button 
-                    className="combo-add-btn" 
+                  <button
+                    className="combo-add-btn"
                     onClick={addWithModifiers}
                     style={{ background: themeColor }}
                   >
@@ -2635,31 +2636,31 @@ function App() {
                 >
                   <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                 </button>
-                
+
                 <div className="full-screen-payment-content">
                   <h1 className="payment-total-text">TOTAL: ${subTotal}</h1>
                   <h2 className="payment-choose-text">Choose your payment mode</h2>
-                  
+
                   <div className="payment-options-row">
                     {/* Card 1 */}
                     <div className="payment-mode-card" onClick={() => {
-                        setShowPaymentPopup(false);
-                        handlePayOnline();
-                      }}>
+                      setShowPaymentPopup(false);
+                      handlePayOnline();
+                    }}>
                       <div className="payment-mode-icons grid-icons">
                         <MastercardBrand />
                         <VisaBrand />
                         <AmexBrand />
                         <JcbBrand />
                       </div>
-                      <div className="payment-mode-label">Credit/Debit<br/>Card</div>
+                      <div className="payment-mode-label">Credit/Debit<br />Card</div>
                     </div>
 
                     {/* Card 2 */}
                     <div className="payment-mode-card" onClick={() => {
-                        setShowPaymentPopup(false);
-                        handlePayOnline();
-                      }}>
+                      setShowPaymentPopup(false);
+                      handlePayOnline();
+                    }}>
                       <div className="payment-mode-icons single-icon">
                         <WechatBrand />
                       </div>
@@ -2668,38 +2669,38 @@ function App() {
 
                     {/* Card 3 */}
                     <div className="payment-mode-card" onClick={async () => {
-                        try {
-                          await fetch(`${API}/order/mark-sent`, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ orderId: currentOrderId })
-                          });
+                      try {
+                        await fetch(`${API}/order/mark-sent`, {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ orderId: currentOrderId })
+                        });
 
-                          await fetch(`${API}/order/payment-status`, {
-                            method: "POST",
-                            headers: {
-                              "Content-Type": "application/json"
-                            },
-                            body: JSON.stringify({
-                              tableId: tableId,
-                              paymentStatus: 0
-                            })
-                          });
+                        await fetch(`${API}/order/payment-status`, {
+                          method: "POST",
+                          headers: {
+                            "Content-Type": "application/json"
+                          },
+                          body: JSON.stringify({
+                            tableId: tableId,
+                            paymentStatus: 0
+                          })
+                        });
 
-                        } catch (e) {
-                          console.error(e);
-                        }
-                        setShowPaymentPopup(false);
+                      } catch (e) {
+                        console.error(e);
+                      }
+                      setShowPaymentPopup(false);
 
-                        const finalOrderId = currentOrderIdRef.current || currentOrderId;
-                        if (isKiosk) {
-                          // Kiosk: show thank-you screen for 5s then reset
-                          showKioskThankYou(finalOrderId);
-                        } else {
-                          window.location.href = `/settlement-success?tableId=${tableId}&table=${tableNo}&orderId=${finalOrderId}`;
-                        }
+                      const finalOrderId = currentOrderIdRef.current || currentOrderId;
+                      if (isKiosk) {
+                        // Kiosk: show thank-you screen for 5s then reset
+                        showKioskThankYou(finalOrderId);
+                      } else {
+                        window.location.href = `/settlement-success?tableId=${tableId}&table=${tableNo}&orderId=${finalOrderId}`;
+                      }
 
-                      }}>
+                    }}>
                       <div className="payment-mode-icons split-icons">
                         <CashBrand />
                         <EzlinkBrand />
