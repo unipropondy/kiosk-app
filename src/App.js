@@ -13,6 +13,20 @@ import PullToRefresh from 'react-simple-pull-to-refresh';
 
 import SettlementSuccess from "./SettlementSuccess";
 import UniversalPrinter from "./components/UniversalPrinter";
+import { Beef, Cake, ChefHat, Coffee, Croissant, Flame, Pizza, Sandwich, Soup, Utensils } from "lucide-react";
+
+const getFallbackIcon = (categoryName) => {
+  const name = (categoryName || '').toLowerCase();
+  if (name.includes('bev') || name.includes('drink') || name.includes('juice') || name.includes('tea') || name.includes('coffee')) return <Coffee size={28} color="#f97316" strokeWidth={1.5} />;
+  if (name.includes('kebab') || name.includes('meat') || name.includes('grill') || name.includes('bbq')) return <Flame size={28} color="#f97316" strokeWidth={1.5} />;
+  if (name.includes('pizza') || name.includes('italian')) return <Pizza size={28} color="#f97316" strokeWidth={1.5} />;
+  if (name.includes('burger') || name.includes('sandwich') || name.includes('fast')) return <Sandwich size={28} color="#f97316" strokeWidth={1.5} />;
+  if (name.includes('cake') || name.includes('dessert') || name.includes('sweet') || name.includes('bakery')) return <Cake size={28} color="#f97316" strokeWidth={1.5} />;
+  if (name.includes('indian') || name.includes('curry') || name.includes('soup') || name.includes('gravy')) return <Soup size={28} color="#f97316" strokeWidth={1.5} />;
+  if (name.includes('leban') || name.includes('wrap') || name.includes('shawarma') || name.includes('roll')) return <Croissant size={28} color="#f97316" strokeWidth={1.5} />;
+  if (name.includes('chinese') || name.includes('asian') || name.includes('noodle') || name.includes('rice')) return <Utensils size={28} color="#f97316" strokeWidth={1.5} />;
+  return <ChefHat size={28} color="#f97316" strokeWidth={1.5} />;
+};
 
 function App() {
 
@@ -1921,7 +1935,8 @@ function App() {
                   </div> */}
 
                   <div className="sidebar-cat-list">
-                    {(Array.isArray(categories) ? categories : []).map((cat) => (
+                    {(Array.isArray(categories) ? categories : []).map((cat) => {
+                      return (
                       <button
                         key={cat.CategoryId}
                         className={`sidebar-cat-item ${activeCategory === cat.CategoryId ? "active" : ""}`}
@@ -1930,12 +1945,28 @@ function App() {
                           loadGroups(cat.CategoryId);
                         }}
                       >
-                        <div className="cat-item-icon">
-                          <ForkKnifeIcon />
+                        <div className="cat-indicator"></div>
+                        <div className="cat-image-container">
+                          {cat.ImagePath
+                            ? <img src={cat.ImagePath} alt={cat.KitchenTypeName} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                            : getFallbackIcon(cat.KitchenTypeName)
+                          }
                         </div>
-                        <span className="cat-item-name">{cat.KitchenTypeName}</span>
+                        <div className="cat-info">
+                          <span className="cat-item-name">{cat.KitchenTypeName}</span>
+                          <div className="cat-decorative-lines">
+                            <span className="line-solid"></span>
+                            <span className="line-dashed-dot"></span>
+                            <span className="line-dashed-dot"></span>
+                          </div>
+                        </div>
+                        <div className="cat-arrow">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="9 18 15 12 9 6" />
+                          </svg>
+                        </div>
                       </button>
-                    ))}
+                    )})}
                     {/* ADD LOGOUT BUTTON HERE */}
                     <div className="sidebar-logout">
                       <button

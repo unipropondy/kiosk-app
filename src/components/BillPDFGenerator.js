@@ -409,8 +409,8 @@ class BillPDFGenerator {
                         parseFloat(opt.surcharge || 0) +
                         parseFloat(opt.dishPrice || 0);
                       return `<div class="item-modifiers">↳ ${opt.name}${effectiveAdd > 0
-                          ? ` (+${currencySymbol}${effectiveAdd.toFixed(2)})`
-                          : ""
+                        ? ` (+${currencySymbol}${effectiveAdd.toFixed(2)})`
+                        : ""
                         }</div>`;
                     })
                     .join("") || ""
@@ -776,7 +776,7 @@ class BillPDFGenerator {
               <div class="thankyou">THANK YOU! COME AGAIN!</div>
             `
       }
-            <div class="copyright">SMART-POS BY UNIPROSG</div>
+            <div class="copyright">SMART-CAFE BY UNIPROSG</div>
           </div>
           </div>
         </div>
