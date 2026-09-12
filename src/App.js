@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 // import axios from "axios";
 import { io } from "socket.io-client";
-import KioskStartPage from "./KioskStartPage";
+import LoginPage from "./LoginPage";
 import "./App.css";
 import { BASE_URL } from "./Configs/api";
 import { QRCodeSVG } from "qrcode.react";
@@ -17,15 +17,35 @@ import { Beef, Cake, ChefHat, Coffee, Croissant, Flame, Pizza, Sandwich, Soup, U
 
 const getFallbackIcon = (categoryName) => {
   const name = (categoryName || '').toLowerCase();
-  if (name.includes('bev') || name.includes('drink') || name.includes('juice') || name.includes('tea') || name.includes('coffee')) return <Coffee size={28} color="#f97316" strokeWidth={1.5} />;
-  if (name.includes('kebab') || name.includes('meat') || name.includes('grill') || name.includes('bbq')) return <Flame size={28} color="#f97316" strokeWidth={1.5} />;
-  if (name.includes('pizza') || name.includes('italian')) return <Pizza size={28} color="#f97316" strokeWidth={1.5} />;
-  if (name.includes('burger') || name.includes('sandwich') || name.includes('fast')) return <Sandwich size={28} color="#f97316" strokeWidth={1.5} />;
-  if (name.includes('cake') || name.includes('dessert') || name.includes('sweet') || name.includes('bakery')) return <Cake size={28} color="#f97316" strokeWidth={1.5} />;
-  if (name.includes('indian') || name.includes('curry') || name.includes('soup') || name.includes('gravy')) return <Soup size={28} color="#f97316" strokeWidth={1.5} />;
-  if (name.includes('leban') || name.includes('wrap') || name.includes('shawarma') || name.includes('roll')) return <Croissant size={28} color="#f97316" strokeWidth={1.5} />;
-  if (name.includes('chinese') || name.includes('asian') || name.includes('noodle') || name.includes('rice')) return <Utensils size={28} color="#f97316" strokeWidth={1.5} />;
-  return <ChefHat size={28} color="#f97316" strokeWidth={1.5} />;
+  const isDiamond = name.includes('diamond');
+  const isPlatinum = name.includes('platinum');
+  const isOpal = name.includes('opal');
+  const isDetailed = isDiamond || isPlatinum || isOpal;
+
+  return (
+    <svg width="48" height="48" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+      {isDiamond && (
+        <path d="m24 3 3 4 5 1-3 4 1 5-6-2-6 2 1-5-3-4 5-1 3-4Z" stroke="#ff6b1a" strokeWidth="2" strokeLinejoin="round" />
+      )}
+      {isPlatinum && (
+        <path d="m14 12 5 4 5-7 5 7 5-4-3 14H17l-3-14Z" stroke="#ff6b1a" strokeWidth="2" strokeLinejoin="round" />
+      )}
+      {isOpal && (
+        <path d="m11 9 5 5 7-9 4 9 6-5-3 10-8 7-9-7-2-10Z" stroke="#ff6b1a" strokeWidth="2" strokeLinejoin="round" />
+      )}
+      {!isDetailed && (
+        <>
+          <circle cx="14" cy="9" r="2" stroke="#ff6b1a" strokeWidth="1.8" />
+          <circle cx="24" cy="6" r="1.5" stroke="#ff6b1a" strokeWidth="1.8" />
+          <circle cx="32" cy="10" r="2" stroke="#ff6b1a" strokeWidth="1.8" />
+        </>
+      )}
+      <path d="M29 19H19a4 4 0 0 0-3.8 2.8L14 25h-3a3 3 0 0 0-3 3v4h4a5 5 0 0 0 10 0h4a5 5 0 0 0 10 0h4v-4a3 3 0 0 0-3-3h-3l-1.2-3.2A4 4 0 0 0 29 19Z" stroke="#ff6b1a" strokeWidth="2" strokeLinejoin="round" />
+      <circle cx="17" cy="32" r="2.5" stroke="#ff6b1a" strokeWidth="2" />
+      <circle cx="31" cy="32" r="2.5" stroke="#ff6b1a" strokeWidth="2" />
+      <path d="M20 25h8" stroke="#ff6b1a" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
 };
 
 function App() {
@@ -1584,6 +1604,17 @@ function App() {
     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"></path><path d="M7 2v20"></path><path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"></path></svg>
   );
 
+  const HeroCarIcon = () => (
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 6h-4a2 2 0 0 0-2 2l-1 3H5a2 2 0 0 0-2 2v3h2a2.5 2.5 0 0 0 5 0h4a2.5 2.5 0 0 0 5 0h2v-3a2 2 0 0 0-2-2h-2l-1-3a2 2 0 0 0-2-2z" />
+      <circle cx="7.5" cy="16.5" r="1.5" />
+      <circle cx="16.5" cy="16.5" r="1.5" />
+      <circle cx="10" cy="3" r="1" />
+      <circle cx="14" cy="2" r="1" />
+      <circle cx="17" cy="4" r="1" />
+    </svg>
+  );
+
   const BurgerDrinkIcon = () => (
     <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke={themeColor} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <path d="M18 8h1a4 4 0 0 1 0 8h-1"></path>
@@ -1604,7 +1635,7 @@ function App() {
   );
 
   const MastercardBrand = () => (
-    <svg width="28" height="18" viewBox="0 0 24 16">
+    <svg width="56" height="36" viewBox="0 0 24 16">
       <circle cx="8" cy="8" r="8" fill="#EB001B" />
       <circle cx="16" cy="8" r="8" fill="#F79E1B" fillOpacity="0.8" />
     </svg>
@@ -1625,18 +1656,18 @@ function App() {
   );
 
   const VisaBrand = () => (
-    <div style={{ color: '#1434CB', fontWeight: '900', fontStyle: 'italic', fontSize: '15px', letterSpacing: '-1px' }}>VISA</div>
+    <div style={{ color: '#1434CB', fontWeight: '900', fontStyle: 'italic', fontSize: '30px', letterSpacing: '-2px' }}>VISA</div>
   );
 
   const AmexBrand = () => (
-    <div style={{ background: '#2671B9', color: '#fff', fontSize: '6px', fontWeight: 'bold', padding: '2px', borderRadius: '2px', lineHeight: 1.1, width: '28px', textAlign: 'center' }}>
+    <div style={{ background: '#2671B9', color: '#fff', fontSize: '12px', fontWeight: 'bold', padding: '4px', borderRadius: '4px', lineHeight: 1.1, width: '56px', textAlign: 'center' }}>
       AMERICAN<br />EXPRESS
     </div>
   );
 
   const CashBrand = () => (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-      <svg width="24" height="20" viewBox="0 0 40 30" fill="none">
+      <svg width="72" height="54" viewBox="0 0 40 30" fill="none">
         <rect x="2" y="4" width="28" height="16" rx="2" fill="#2ECC71" />
         <circle cx="16" cy="12" r="3" fill="#27AE60" />
         <circle cx="26" cy="20" r="6" fill="#F1C40F" stroke="#F39C12" strokeWidth="1" />
@@ -1668,24 +1699,24 @@ function App() {
 
   const JcbBrand = () => (
     <div style={{ display: 'flex', gap: '1px', fontWeight: 'bold', fontSize: '10px' }}>
-      <div style={{ background: '#005BBB', color: '#fff', padding: '1px 2px', borderRadius: '1px' }}>J</div>
-      <div style={{ background: '#E3000F', color: '#fff', padding: '1px 2px', borderRadius: '1px' }}>C</div>
-      <div style={{ background: '#008C36', color: '#fff', padding: '1px 2px', borderRadius: '1px' }}>B</div>
+      {/* <div style={{ background: '#005BBB', color: '#fff', padding: '1px 2px', borderRadius: '1px' }}>J</div> */}
+      {/* <div style={{ background: '#E3000F', color: '#fff', padding: '1px 2px', borderRadius: '1px' }}>C</div> */}
+      {/* <div style={{ background: '#008C36', color: '#fff', padding: '1px 2px', borderRadius: '1px' }}>B</div> */}
     </div>
   );
 
-  const WechatBrand = () => (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#1AAD19', fontSize: '12px', fontWeight: 'bold' }}>
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M8.5 13.5c-3.5 0-6.3-2.3-6.3-5.2 0-2.9 2.8-5.2 6.3-5.2 3.5 0 6.3 2.3 6.3 5.2 0 2.9-2.8 5.2-6.3 5.2-.6 0-1.1-.1-1.6-.2l-2.1 1.1.5-1.9c-1.7-1-2.9-2.5-2.9-4.2zm6.7-1.1c.3.1.6.1.8.1 2.5 0 4.5-1.7 4.5-3.8 0-2.1-2-3.8-4.5-3.8-.2 0-.4 0-.6.1-.1-1.3-.8-2.5-1.9-3.3 1.1-.5 2.4-.8 3.7-.8 4.2 0 7.6 2.8 7.6 6.3 0 3.5-3.4 6.3-7.6 6.3-.7 0-1.4-.1-2.1-.3l-2.5 1.3.6-2.2c-2.1-1.2-3.5-3-3.5-5.1 0-1 .3-2 .8-2.9 1.3 1.3 3 2.3 4.7 3.1z" />
-      </svg>
-      WeChat Pay
-    </div>
-  );
+  // const WechatBrand = () => (
+  //   <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#1AAD19', fontSize: '12px', fontWeight: 'bold' }}>
+  //     <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+  //       <path d="M8.5 13.5c-3.5 0-6.3-2.3-6.3-5.2 0-2.9 2.8-5.2 6.3-5.2 3.5 0 6.3 2.3 6.3 5.2 0 2.9-2.8 5.2-6.3 5.2-.6 0-1.1-.1-1.6-.2l-2.1 1.1.5-1.9c-1.7-1-2.9-2.5-2.9-4.2zm6.7-1.1c.3.1.6.1.8.1 2.5 0 4.5-1.7 4.5-3.8 0-2.1-2-3.8-4.5-3.8-.2 0-.4 0-.6.1-.1-1.3-.8-2.5-1.9-3.3 1.1-.5 2.4-.8 3.7-.8 4.2 0 7.6 2.8 7.6 6.3 0 3.5-3.4 6.3-7.6 6.3-.7 0-1.4-.1-2.1-.3l-2.5 1.3.6-2.2c-2.1-1.2-3.5-3-3.5-5.1 0-1 .3-2 .8-2.9 1.3 1.3 3 2.3 4.7 3.1z" />
+  //     </svg>
+  //     WeChat Pay
+  //   </div>
+  // );
 
   const EzlinkBrand = () => (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '2px', color: '#004B87', fontWeight: 'bold', fontSize: '14px', fontStyle: 'italic' }}>
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#004B87', fontWeight: 'bold', fontSize: '28px', fontStyle: 'italic' }}>
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="currentColor">
         <circle cx="12" cy="12" r="10" fill="#004B87" />
         <path d="M8 8h8v2H10v2h5v2h-5v2h8v2H8V8z" fill="#fff" />
       </svg>
@@ -1783,8 +1814,8 @@ function App() {
 
   if (!isLoggedIn) {
     return (
-      <KioskStartPage
-        onStart={(user) => {
+      <LoginPage
+        onLoginSuccess={(user) => {
           // Check if the session was started via the Kiosk start page
           const storedKioskOrderId = localStorage.getItem("kioskOrderId");
           if (storedKioskOrderId) {
@@ -1845,9 +1876,9 @@ function App() {
                     lineHeight: 1,
                     textShadow: '0 4px 24px rgba(0,0,0,0.2)'
                   }}>
-                    THANKS Y'ALL
+                    Thank You!
                   </div>
-                  <div style={{
+                  {/* <div style={{
                     fontSize: 'clamp(20px, 4vw, 34px)',
                     fontWeight: '600',
                     color: 'rgba(255,255,255,0.88)',
@@ -1855,7 +1886,7 @@ function App() {
                     fontStyle: 'italic'
                   }}>
                     Chicken's on the way!
-                  </div>
+                  </div> */}
                 </div>
 
                 {/* Order Number Circle */}
@@ -1880,7 +1911,7 @@ function App() {
                   </div>
                   <div style={{
                     fontSize: 'clamp(64px, 14vw, 110px)',
-                    fontWeight: '900',
+                    fontWeight: '500',
                     color: '#ea580c',
                     lineHeight: 1,
                     letterSpacing: '-2px'
@@ -2004,7 +2035,7 @@ function App() {
                     <div className="hero-banner">
                       <div className="hero-icon">
                         <div className="hero-icon-circle">
-                          <ForkKnifeIcon />
+                          <HeroCarIcon />
                         </div>
                       </div>
                       <div className="hero-text">
@@ -2656,16 +2687,7 @@ function App() {
                       <div className="payment-mode-label">Credit/Debit<br />Card</div>
                     </div>
 
-                    {/* Card 2 */}
-                    <div className="payment-mode-card" onClick={() => {
-                      setShowPaymentPopup(false);
-                      handlePayOnline();
-                    }}>
-                      <div className="payment-mode-icons single-icon">
-                        <WechatBrand />
-                      </div>
-                      <div className="payment-mode-label">WeChat Pay</div>
-                    </div>
+
 
                     {/* Card 3 */}
                     <div className="payment-mode-card" onClick={async () => {

@@ -350,23 +350,27 @@ export default function LoginPage({ onLoginSuccess }) {
         </div>
       )}
       <div className="login-root">
-        <div className="login-top-curve">
-          {/* <div className="login-table-badge">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-             <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 0 1 0-5 2.5 2.5 0 0 1 0 5z"/>
-          </svg>
-          Table 30
-        </div> */}
-        </div>
-
+        <div className="login-kiosk-layout">
+          <div className="login-left-pane">
+          </div>
+          <div className="login-center-pane">
         <div className="login-card">
+
+          <div className="login-top-badge">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 6h-4a2 2 0 0 0-2 2l-1 3H5a2 2 0 0 0-2 2v3h2a2.5 2.5 0 0 0 5 0h4a2.5 2.5 0 0 0 5 0h2v-3a2 2 0 0 0-2-2h-2l-1-3a2 2 0 0 0-2-2z" />
+              <circle cx="7.5" cy="16.5" r="1.5" />
+              <circle cx="16.5" cy="16.5" r="1.5" />
+              <circle cx="10" cy="3" r="1" />
+              <circle cx="14" cy="2" r="1" />
+              <circle cx="17" cy="4" r="1" />
+            </svg>
+          </div>
 
           {/* Brand */}
           <div className="login-brand">
-            <div className="login-logo-ring">
-              <img src="https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&w=150&h=150" alt="Restaurant Logo" />
-            </div>
-            <div className="login-brand-name">Unipro POS</div>
+            <div className="login-brand-name">ISLAND CAR <span>Wash</span></div>
+            <div className="login-brand-sub">Unipro</div>
           </div>
 
           {/* Tab Switcher */}
@@ -391,12 +395,12 @@ export default function LoginPage({ onLoginSuccess }) {
             </button>
           </div>
 
-          {tab === "signin" && (
+          {/* {tab === "signin" && (
             <div className="login-heading">
-              <div className="login-title">Hello</div>
-              <div className="login-subtitle">Sign into your Account</div>
+              <div className="login-title">Welcome Back!</div>
+              <div className="login-subtitle">Sign into your account to continue</div>
             </div>
-          )}
+          )} */}
 
           {/* ── SIGN IN FORM ────────────────────────── */}
           {tab === "signin" && (
@@ -447,9 +451,15 @@ export default function LoginPage({ onLoginSuccess }) {
                 </div>
               </div>
 
-              <div className="login-forgot-password">
-                <a href="#forgot" onClick={(e) => e.preventDefault()}>Forgot your Password?</a>
-              </div>
+              {/* <div className="login-options">
+                <label className="login-remember">
+                  <input type="checkbox" />
+                  Remember me
+                </label>
+                <div className="login-forgot-password">
+                  <a href="#forgot" onClick={(e) => e.preventDefault()}>Forgot Password?</a>
+                </div>
+              </div> */}
 
               {error && (
                 <div className="login-error" role="alert">
@@ -464,7 +474,7 @@ export default function LoginPage({ onLoginSuccess }) {
                 disabled={loading}
               >
                 {loading && <span className="login-spinner" />}
-                Login
+                Sign In <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
               </button>
 
               <div className="login-divider">or</div>
@@ -495,7 +505,7 @@ export default function LoginPage({ onLoginSuccess }) {
                 <UserIcon /> Continue as Guest
               </button>
 
-              <div className="login-footer-text">
+              <div className="login-footer-text" style={{marginTop: 20}}>
                 Don't have an account?{" "}
                 <button
                   type="button"
@@ -637,6 +647,10 @@ export default function LoginPage({ onLoginSuccess }) {
 
         </div>
 
+        
+          \n        </div>
+
+        </div>
         {/* Loading Overlay */}
         {loading && (
           <div className="login-loading-overlay" role="status" aria-live="polite">
