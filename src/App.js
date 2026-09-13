@@ -101,17 +101,6 @@ function App() {
   const [paymentDone, setPaymentDone] = useState(false);
   const [kioskThankYouOrderId, setKioskThankYouOrderId] = useState(null);
 
-  const returnToKioskStartPage = () => {
-    localStorage.removeItem("kioskOrderId");
-    localStorage.removeItem("kioskOrderType");
-    localStorage.removeItem("orderId");
-    localStorage.removeItem("tableId");
-    localStorage.removeItem("tableNo");
-    localStorage.setItem("returnToKioskStart", "true");
-    sessionStorage.removeItem("isLoggedIn");
-    window.location.href = "/";
-  };
-
   const [showCartPage, setShowCartPage] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -1131,7 +1120,7 @@ function App() {
 
       setTimeout(() => {
         if (isKiosk) {
-          returnToKioskStartPage();
+          window.location.href = `/settlement-success?kiosk=1&tableId=${encodeURIComponent(tableId)}&table=${encodeURIComponent(tableNo)}&orderId=${encodeURIComponent(posOrderId)}`;
         } else {
           window.location.href =
             `/settlement-success?tableId=${tableId}&table=${tableNo}&orderId=${posOrderId}`;
@@ -2748,8 +2737,9 @@ function App() {
                       setShowPaymentPopup(false);
 
                       const finalOrderId = currentOrderIdRef.current || currentOrderId;
-                      if (isKiosk) {
-                        returnToKioskStartPage();
+                      const isKioskPayment = isKiosk || Boolean(localStorage.getItem("kioskOrderType"));
+                      if (isKioskPayment) {
+                        window.location.href = `/settlement-success?kiosk=1&tableId=${encodeURIComponent(tableId)}&table=${encodeURIComponent(tableNo)}&orderId=${encodeURIComponent(finalOrderId)}`;
                       } else {
                         window.location.href = `/settlement-success?tableId=${tableId}&table=${tableNo}&orderId=${finalOrderId}`;
                       }
