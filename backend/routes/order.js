@@ -755,6 +755,28 @@ async function syncTableStatus(req, tableId) {
 // ═══════════════════════════════════════════════════════════════
 
 /**
+ * GET /api/order/kiosk/tables
+ * Returns available service tables from the configured kiosk sections.
+ */
+router.get("/kiosk/tables", async (req, res) => {
+  try {
+    const pool = await poolPromise;
+    const result = await pool.request().query(`
+      SELECT TableId, TableNumber AS TableNo
+      FROM TableMaster
+      WHERE DiningSection IN (1, 2, 3)
+        AND ISNULL(Status, 0) = 0
+      ORDER BY TableNumber ASC
+    `);
+
+    res.json({ success: true, tables: result.recordset });
+  } catch (err) {
+    console.error("[Kiosk] /kiosk/tables ERROR:", err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
  * POST /api/order/kiosk/start
  * Called when a customer starts a Kiosk session (EAT IN or TAKE AWAY).
  * Generates a fresh, sequential, concurrency-safe OrderNumber.
@@ -762,9 +784,10 @@ async function syncTableStatus(req, tableId) {
  */
 router.post("/kiosk/start", async (req, res) => {
   try {
+    const { tableId, tableNo } = req.body || {};
     const orderNumber = await generateKioskOrderNumber();
     console.log(`[Kiosk] New session started. OrderNumber: ${orderNumber}`);
-    res.json({ success: true, orderNumber });
+    res.json({ success: true, orderNumber, tableId: tableId || null, tableNo: tableNo || null });
   } catch (err) {
     console.error("[Kiosk] /kiosk/start ERROR:", err.message);
     res.status(500).json({ success: false, error: err.message });

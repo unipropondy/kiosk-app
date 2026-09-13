@@ -184,15 +184,6 @@ export default function LoginPage({ onLoginSuccess }) {
       if (data.success) {
         console.log("LOGIN RESPONSE:", data);
 
-        try {
-          await assignTakeawayTable();
-        } catch (tableError) {
-          setError(tableError.message || "Unable to assign a new table.");
-          setLoading(false);
-          return;
-        }
-
-        sessionStorage.setItem("isLoggedIn", "true");
         localStorage.setItem("qr_pos_user", JSON.stringify(data.user));
 
         if (data.user?.Promocode) {
@@ -259,14 +250,6 @@ export default function LoginPage({ onLoginSuccess }) {
       console.log("LOGIN RESPONSE:", data);
       if (data.success) {
         localStorage.setItem("qr_pos_user", JSON.stringify(data.user));
-
-        try {
-          await assignTakeawayTable();
-        } catch (tableError) {
-          setError(tableError.message || "Unable to assign a new table.");
-          setLoading(false);
-          return;
-        }
 
         if (data.user?.Promocode && data.user.Promocode.trim() !== "") {
 
@@ -486,9 +469,7 @@ export default function LoginPage({ onLoginSuccess }) {
                   setError("");
                   setLoading(true);
                   try {
-                    await assignTakeawayTable();
                     const guestUser = { FullName: "Guest", UserId: "guest", UserName: "guest" };
-                    sessionStorage.setItem("isLoggedIn", "true");
                     localStorage.setItem("qr_pos_user", JSON.stringify(guestUser));
                     if (onLoginSuccess) {
                       onLoginSuccess(guestUser);
@@ -674,14 +655,6 @@ export default function LoginPage({ onLoginSuccess }) {
                 className="login-submit-btn"
                 onClick={async () => {
                   console.log("SIGNUP USER:", signedUpUser);
-                  try {
-                    await assignTakeawayTable();
-                  } catch (tableError) {
-                    setError(tableError.message || "Unable to assign a new table.");
-                    setShowGiftModal(false);
-                    return;
-                  }
-
                   // Login session create
                   sessionStorage.setItem("isLoggedIn", "true");
                   localStorage.setItem("qr_pos_user", JSON.stringify(signedUpUser));

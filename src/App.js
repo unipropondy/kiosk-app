@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 // import axios from "axios";
 import { io } from "socket.io-client";
 import LoginPage from "./LoginPage";
+import KioskStartPage from "./KioskStartPage";
 import "./App.css";
 import { BASE_URL } from "./Configs/api";
 import { QRCodeSVG } from "qrcode.react";
@@ -14,6 +15,35 @@ import PullToRefresh from 'react-simple-pull-to-refresh';
 import SettlementSuccess from "./SettlementSuccess";
 import UniversalPrinter from "./components/UniversalPrinter";
 import { Beef, Cake, ChefHat, Coffee, Croissant, Flame, Pizza, Sandwich, Soup, Utensils } from "lucide-react";
+
+const updateViewportVariables = () => {
+  const viewport = window.visualViewport;
+  const viewportWidth = viewport?.width || window.innerWidth;
+  const viewportHeight = viewport?.height || window.innerHeight;
+  const root = document.documentElement;
+
+  root.style.setProperty("--viewport-width", `${Math.round(viewportWidth)}px`);
+  root.style.setProperty("--viewport-height", `${Math.round(viewportHeight)}px`);
+};
+
+function useViewportVariables() {
+  useEffect(() => {
+    updateViewportVariables();
+
+    const handleViewportChange = () => updateViewportVariables();
+    window.addEventListener("resize", handleViewportChange, { passive: true });
+    window.addEventListener("orientationchange", handleViewportChange, { passive: true });
+    window.visualViewport?.addEventListener("resize", handleViewportChange, { passive: true });
+    window.visualViewport?.addEventListener("scroll", handleViewportChange, { passive: true });
+
+    return () => {
+      window.removeEventListener("resize", handleViewportChange);
+      window.removeEventListener("orientationchange", handleViewportChange);
+      window.visualViewport?.removeEventListener("resize", handleViewportChange);
+      window.visualViewport?.removeEventListener("scroll", handleViewportChange);
+    };
+  }, []);
+}
 
 const getFallbackIcon = (categoryName) => {
   const name = (categoryName || '').toLowerCase();
@@ -50,12 +80,15 @@ const getFallbackIcon = (categoryName) => {
 
 function App() {
 
+  useViewportVariables();
+
   const skipSaveRef = useRef(false);
   const deleteInProgressRef = useRef(false);
   const actionRef = useRef(""); // "INSERT", "UPDATE", "DELETE"
   const pendingSaveRef = useRef(null); // tracks in-flight saveCartToBackend promise
   const currentOrderIdRef = useRef(null); // always holds the latest orderId synchronously
   const [isLoggedIn, setIsLoggedIn] = useState(() => sessionStorage.getItem("isLoggedIn") === "true");
+  const [showKioskStartPage, setShowKioskStartPage] = useState(false);
 
   const API = `${BASE_URL}/api`;
   const [search, setSearch] = useState("");
@@ -383,6 +416,10 @@ function App() {
   const filteredItems = dishes.filter((dish) =>
     dish.Name?.toLowerCase().includes(search.toLowerCase())
   );
+
+  const heroDescription = dishes
+    .map((dish) => String(dish?.Description ?? dish?.description ?? "").trim())
+    .find(Boolean) || "No description available.";
 
   // When dishes change, pre-fetch modifier status for all of them in parallel
   useEffect(() => {
@@ -1813,34 +1850,26 @@ function App() {
   }
 
   if (!isLoggedIn) {
-    return (
-      <LoginPage
-        onLoginSuccess={(user) => {
-          // Check if the session was started via the Kiosk start page
-          const storedKioskOrderId = localStorage.getItem("kioskOrderId");
-          if (storedKioskOrderId) {
-            // KIOSK mode: use the generated sequential order number, no tableId
+    if (showKioskStartPage) {
+      return (
+        <KioskStartPage
+          onStart={(user, selectedTable) => {
+            const storedKioskOrderId = localStorage.getItem("kioskOrderId");
             setIsKiosk(true);
             setCurrentOrderId(storedKioskOrderId);
             currentOrderIdRef.current = storedKioskOrderId;
-            // Clear any stale table info
-            setTableId("");
-            setTableNo("");
-          } else {
-            // Legacy table-based mode
-            const storedTableId = localStorage.getItem("tableId");
-            const storedTableNo = localStorage.getItem("tableNo");
-            const storedOrderId = localStorage.getItem("orderId");
-            if (storedTableId) setTableId(storedTableId);
-            if (storedTableNo) setTableNo(storedTableNo);
-            if (storedOrderId) {
-              setCurrentOrderId(storedOrderId);
-              currentOrderIdRef.current = storedOrderId;
-            }
-          }
-          // Flip the login flag — triggers re-render without a page reload
-          setIsLoggedIn(true);
-        }}
+            setTableId(selectedTable?.tableId || localStorage.getItem("tableId") || "");
+            setTableNo(selectedTable?.tableNo || localStorage.getItem("tableNo") || "");
+            setShowKioskStartPage(false);
+            setIsLoggedIn(true);
+          }}
+        />
+      );
+    }
+
+    return (
+      <LoginPage
+        onLoginSuccess={() => setShowKioskStartPage(true)}
       />
     );
   }
@@ -2038,10 +2067,15 @@ function App() {
                           <HeroCarIcon />
                         </div>
                       </div>
-                      <div className="hero-text">
-                        <h2>{categories.find(c => c.CategoryId === activeCategory)?.KitchenTypeName || 'Special Offers'}</h2>
-                        <p>Savor the rich and authentic flavors of {categories.find(c => c.CategoryId === activeCategory)?.KitchenTypeName || 'our kitchen'}.</p>
-                      </div>
+                     <div className="hero-text">
+  <h2>
+    {categories.find(c => c.CategoryId === activeCategory)?.KitchenTypeName || "Special Offers"}
+  </h2>
+
+  <p>
+    {heroDescription}
+  </p>
+</div>
                     </div>
                   </div>
                 )}
@@ -2095,7 +2129,7 @@ function App() {
                         <div className="new-kiosk-dish-info">
                           <div className="new-kiosk-dish-name">{dish.Name}</div>
                           <div className="new-kiosk-dish-desc">
-                            {dish.Description || "Delicious dish served with love."}
+                            { "Premium Car Care. Exceptional Service."}
                           </div>
                           <div className="new-kiosk-dish-price">
                             ${Number(dish.Price || 0).toFixed(2)}
@@ -2748,7 +2782,7 @@ function App() {
 
             {showOnlinePayment && (
               <div className="modal-overlay" style={{ zIndex: 10001, padding: 0 }}>
-                <div className="pos-app" style={{ width: '100vw', height: '100dvh', background: '#fdfbf7', display: 'flex', flexDirection: 'column', borderRadius: 0 }}>
+                <div className="pos-app" style={{ width: '100%', height: 'var(--viewport-height, 100dvh)', background: '#fdfbf7', display: 'flex', flexDirection: 'column', borderRadius: 0 }}>
 
                   <div className="pos-header" style={{ borderBottom: '1px solid #eee', background: 'white' }}>
                     <button className="icon-btn" onClick={() => setShowOnlinePayment(false)}>
