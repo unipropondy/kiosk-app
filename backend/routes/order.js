@@ -501,6 +501,33 @@ async function syncTableStatus(req, tableId) {
 }
 
 // Routes
+router.get("/kiosk/tables", async (req, res) => {
+  try {
+    const pool = await poolPromise;
+    const result = await pool.request().query(`
+      SELECT TableId, TableNumber AS TableNo
+      FROM TableMaster
+      WHERE DiningSection IN (1, 2, 3)
+        AND ISNULL(Status, 0) = 0
+      ORDER BY TableNumber ASC
+    `);
+    res.json({ success: true, tables: result.recordset });
+  } catch (err) {
+    console.error("[Kiosk] /kiosk/tables ERROR:", err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.post("/kiosk/start", async (req, res) => {
+  try {
+    const orderNumber = String(Date.now()).slice(-8);
+    res.json({ success: true, orderNumber });
+  } catch (err) {
+    console.error("[Kiosk] /kiosk/start ERROR:", err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.post("/save-cart", async (req, res) => {
   try {
     const { tableId, items, userId, orderId } = req.body;

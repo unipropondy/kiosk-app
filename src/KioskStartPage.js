@@ -4,6 +4,14 @@ import { BASE_URL } from "./Configs/api";
 
 const API = `${BASE_URL}/api`;
 
+const readJsonResponse = async (res) => {
+  const contentType = res.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) {
+    throw new Error(`Server route unavailable (${res.status}). Please restart or redeploy the backend.`);
+  }
+  return res.json();
+};
+
 export default function KioskStartPage({ onStart }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -13,7 +21,7 @@ export default function KioskStartPage({ onStart }) {
     setLoading(true);
     try {
       const res = await fetch(`${API}/order/kiosk/tables`);
-      const data = await res.json();
+      const data = await readJsonResponse(res);
       if (!res.ok || !data.success) {
         throw new Error(data.error || "Unable to load service tables.");
       }
@@ -45,7 +53,7 @@ export default function KioskStartPage({ onStart }) {
         }),
       });
 
-      const data = await res.json();
+      const data = await readJsonResponse(res);
 
       if (!data.success) {
         throw new Error(data.error || "Unable to start Kiosk session. Please try again.");
