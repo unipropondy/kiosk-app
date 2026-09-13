@@ -340,9 +340,9 @@ async function syncToProfessionalTables(transaction, tableId, displayOrderId, it
         .input("bizId", sql.UniqueIdentifier, bizId)
         .query(`
           INSERT INTO RestaurantOrderCur
-            (OrderId, OrderNumber, OrderDateTime, Tableno, StatusCode, CreatedBy, CreatedOn, isOrderClosed, BusinessUnitId, entry_Status)
+            (OrderId, OrderNumber, OrderDateTime, Tableno, StatusCode, CreatedBy, CreatedOn, isOrderClosed, BusinessUnitId)
           VALUES
-            (@orderId, @orderNo, GETDATE(), @tableNo, 1, @userId, GETDATE(), 0, @bizId, 'q')
+            (@orderId, @orderNo, GETDATE(), @tableNo, 1, @userId, GETDATE(), 0, @bizId)
         `);
     }
   } else {
