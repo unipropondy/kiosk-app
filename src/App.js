@@ -111,6 +111,7 @@ function App() {
     sessionStorage.removeItem("isLoggedIn");
     window.location.href = "/";
   };
+
   const [showCartPage, setShowCartPage] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [loading, setLoading] = useState(true);
