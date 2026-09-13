@@ -88,7 +88,9 @@ function App() {
   const pendingSaveRef = useRef(null); // tracks in-flight saveCartToBackend promise
   const currentOrderIdRef = useRef(null); // always holds the latest orderId synchronously
   const [isLoggedIn, setIsLoggedIn] = useState(() => sessionStorage.getItem("isLoggedIn") === "true");
-  const [showKioskStartPage, setShowKioskStartPage] = useState(false);
+  const [showKioskStartPage, setShowKioskStartPage] = useState(
+    () => localStorage.getItem("returnToKioskStart") === "true"
+  );
 
   const API = `${BASE_URL}/api`;
   const [search, setSearch] = useState("");
@@ -107,6 +109,7 @@ function App() {
       localStorage.removeItem("kioskOrderId");
       localStorage.removeItem("kioskOrderType");
       localStorage.removeItem("orderId");
+      localStorage.setItem("returnToKioskStart", "true");
       sessionStorage.removeItem("isLoggedIn");
       // Hard reload to Kiosk Start Page
       window.location.href = "/";

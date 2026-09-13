@@ -65,6 +65,7 @@ export default function KioskStartPage({ onStart }) {
       localStorage.setItem("tableId", table.TableId);
       localStorage.setItem("tableNo", table.TableNo);
       localStorage.removeItem("orderId");
+      localStorage.removeItem("returnToKioskStart");
 
       let currentUser = null;
       try {
