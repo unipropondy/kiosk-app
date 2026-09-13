@@ -101,6 +101,13 @@ function App() {
   const [paymentDone, setPaymentDone] = useState(false);
   const [kioskThankYouOrderId, setKioskThankYouOrderId] = useState(null);
 
+  const showKioskThankYouThen = (orderId, targetUrl) => {
+    setKioskThankYouOrderId(orderId);
+    setTimeout(() => {
+      window.location.href = targetUrl;
+    }, 3000);
+  };
+
   const [showCartPage, setShowCartPage] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -1120,7 +1127,10 @@ function App() {
 
       setTimeout(() => {
         if (isKiosk) {
-          window.location.href = `/settlement-success?kiosk=1&tableId=${encodeURIComponent(tableId)}&table=${encodeURIComponent(tableNo)}&orderId=${encodeURIComponent(posOrderId)}`;
+          showKioskThankYouThen(
+            posOrderId,
+            `/settlement-success?kiosk=1&tableId=${encodeURIComponent(tableId)}&table=${encodeURIComponent(tableNo)}&orderId=${encodeURIComponent(posOrderId)}`
+          );
         } else {
           window.location.href =
             `/settlement-success?tableId=${tableId}&table=${tableNo}&orderId=${posOrderId}`;
@@ -2739,7 +2749,10 @@ function App() {
                       const finalOrderId = currentOrderIdRef.current || currentOrderId;
                       const isKioskPayment = isKiosk || Boolean(localStorage.getItem("kioskOrderType"));
                       if (isKioskPayment) {
-                        window.location.href = `/settlement-success?kiosk=1&tableId=${encodeURIComponent(tableId)}&table=${encodeURIComponent(tableNo)}&orderId=${encodeURIComponent(finalOrderId)}`;
+                        showKioskThankYouThen(
+                          finalOrderId,
+                          `/settlement-success?kiosk=1&tableId=${encodeURIComponent(tableId)}&table=${encodeURIComponent(tableNo)}&orderId=${encodeURIComponent(finalOrderId)}`
+                        );
                       } else {
                         window.location.href = `/settlement-success?tableId=${tableId}&table=${tableNo}&orderId=${finalOrderId}`;
                       }

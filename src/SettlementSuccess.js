@@ -51,6 +51,24 @@ function SettlementSuccess() {
 
   const tableId = searchParams.get("tableId") || "";
   const tableNo = searchParams.get("table") || "";
+  const isKioskSettlement = searchParams.get("kiosk") === "1";
+
+  useEffect(() => {
+    if (!isKioskSettlement) return undefined;
+
+    const timer = setTimeout(() => {
+      localStorage.removeItem("kioskOrderId");
+      localStorage.removeItem("kioskOrderType");
+      localStorage.removeItem("orderId");
+      localStorage.removeItem("tableId");
+      localStorage.removeItem("tableNo");
+      localStorage.setItem("returnToKioskStart", "true");
+      sessionStorage.removeItem("isLoggedIn");
+      window.location.href = "/";
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, [isKioskSettlement]);
 
   // Apply saved theme color
   useEffect(() => {
@@ -147,11 +165,12 @@ function SettlementSuccess() {
   return (
     <div className="confirmation-screen">
       <div className="confirmation-card">
-        <div className="confirmation-banner">Order Confirmation</div>
+        <div className="confirmation-banner">Thank You!</div>
 
         {isValidStatus && (
           <div className="confirmation-order-label">
-            Order No: <span>{orderSuffix}</span>
+            <span className="confirmation-order-caption">YOUR ORDER NO.</span>
+            <span className="confirmation-order-number">{orderSuffix}</span>
           </div>
         )}
 
@@ -233,7 +252,7 @@ function SettlementSuccess() {
         )}
 
         <div className="confirmation-subtitle">
-          {isValidStatus ? "Thank you for ordering" : "Please confirm the order"}
+          {isValidStatus ? "Please collect your receipt" : "Please confirm the order"}
         </div>
         <button className="return-order-btn" onClick={goToOrderPage}>
           Return to Order

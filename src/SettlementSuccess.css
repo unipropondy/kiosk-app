@@ -1,5 +1,5 @@
 .confirmation-screen {
-  min-height: var(--viewport-height, 100dvh);
+  min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -83,7 +83,7 @@
   gap: 10px;
 }
 
-.confirmation-order-label span {
+.confirmation-order-label > span.confirmation-order-number {
   display: inline-block;
   font-size: clamp(82px, 12vw, 190px);
   letter-spacing: 0.04em;
@@ -509,5 +509,111 @@
   font-size: 16px;
   font-weight: 900;
   color: var(--theme-color, #f97316);
+}
+
+/* Kiosk thank-you presentation */
+.confirmation-screen {
+  min-height: var(--viewport-height, 100dvh);
+  padding: 0;
+  background: linear-gradient(155deg, #ff7614 0%, #f45b0d 58%, #dc4b08 100%);
+  color: #fff;
+}
+
+.confirmation-screen::before,
+.confirmation-screen::after {
+  display: none;
+}
+
+.confirmation-card {
+  width: 100%;
+  min-height: var(--viewport-height, 100dvh);
+  padding: 24px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  justify-content: center;
+  gap: 0;
+}
+
+.confirmation-banner {
+  margin: 0 0 clamp(28px, 6vh, 58px);
+  padding: 0;
+  background: transparent;
+  color: #fff;
+  font-size: clamp(2.4rem, 6vw, 5rem);
+  line-height: 1;
+  letter-spacing: -0.045em;
+  text-transform: none;
+}
+
+.confirmation-order-label {
+  width: clamp(150px, 24vw, 248px);
+  height: clamp(150px, 24vw, 248px);
+  flex-direction: column;
+  gap: 4px;
+  border-radius: 50%;
+  background: #fff8f3;
+  color: #ef590e;
+  box-shadow: 0 12px 28px rgba(113, 37, 3, 0.2);
+  flex: 0 0 auto;
+  overflow: hidden;
+}
+
+.confirmation-order-label > span.confirmation-order-caption {
+  display: block;
+  color: #ef590e;
+  font-size: clamp(0.6rem, 1.1vw, 0.9rem);
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+
+.confirmation-order-label > span.confirmation-order-number {
+  display: block;
+  color: #ef590e;
+  font-size: clamp(3.2rem, 8vw, 6.6rem);
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  line-height: 0.95;
+  text-shadow: none;
+  flex: 0 0 auto;
+}
+
+.confirmation-subtitle {
+  margin-top: clamp(24px, 4vh, 38px);
+  color: #fff;
+  font-size: clamp(0.95rem, 1.8vw, 1.45rem);
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.confirmation-card > .order-details-icon-btn,
+.confirmation-card > .status-badge,
+.confirmation-card > .status-tracker,
+.confirmation-card > .return-order-btn,
+.confirmation-card > div[style] {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  .confirmation-card {
+    padding: 18px;
+  }
+
+  .confirmation-banner {
+    margin-bottom: 24px;
+    font-size: clamp(2.1rem, 11vw, 3.4rem);
+  }
+
+  .confirmation-order-label {
+    width: clamp(150px, 43vw, 210px);
+    height: clamp(150px, 43vw, 210px);
+  }
+
+  .confirmation-order-label .confirmation-order-number {
+    font-size: clamp(3.4rem, 15vw, 5.4rem);
+  }
 }
 
