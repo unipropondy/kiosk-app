@@ -1102,9 +1102,8 @@ function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           orderId: posOrderId,
-          // For kiosk orders, omit tableNo and tableId — they are table-independent
-          tableNo: isKiosk ? null : tableNo,
-          tableId: isKiosk ? null : tableId,
+          tableNo,
+          tableId,
           kioskOrderType: isKiosk ? localStorage.getItem("kioskOrderType") : undefined,
           totalAmount: parseFloat(amount),
           paymentMethod: "ONLINE",
@@ -1158,7 +1157,8 @@ function App() {
     try {
       const payload = {
         isKiosk: isKiosk,
-        tableId: isKiosk ? undefined : tableId,
+        tableId,
+        tableNo,
         orderId: currentOrderId,
         userId: "00000000-0000-0000-0000-000000000000",
         kioskOrderType: isKiosk ? localStorage.getItem("kioskOrderType") : undefined,
@@ -1355,7 +1355,7 @@ function App() {
 
       const payload = {
         isKiosk: isKiosk,
-        tableId: isKiosk ? undefined : tableId,
+        tableId,
         orderId: currentOrderId,
         userId: "00000000-0000-0000-0000-000000000000",
         kioskOrderType: isKiosk ? localStorage.getItem("kioskOrderType") : undefined,
