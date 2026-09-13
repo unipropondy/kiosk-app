@@ -1404,7 +1404,7 @@ router.post("/complete-online-payment", async (req, res) => {
   const transaction = new sql.Transaction(pool);
 
   try {
-    const { orderId, tableNo, tableId, totalAmount, cart, paymentMethod } = req.body;
+    const { orderId, tableNo, tableId, totalAmount, cart, paymentMethod, gatewayReference, GatewayReference } = req.body;
 
     console.log("🔍 [PAYMENT] complete-online-payment called", {
       orderId,
@@ -1422,7 +1422,7 @@ router.post("/complete-online-payment", async (req, res) => {
     const cleanTableId = tableId ? String(tableId).replace(/^\{|\}$/g, "").trim() : null;
     const amount = parseFloat(totalAmount) || 0;
     const pMethod = (paymentMethod || "ONLINE").toUpperCase();
-    const settlementId = crypto.randomUUID();
+    let settlementId = crypto.randomUUID();
 
     // Generate and queue KOT for any newly added items (StatusCode = 1) before they are updated to 2
     try {
@@ -1640,6 +1640,37 @@ router.post("/complete-online-payment", async (req, res) => {
               `);
       console.log(`✅ [PAYMENT] SettlementHeader inserted: ${settlementId}`);
     }
+
+    // ── STEP 4.5: UPSERT SETTLEMENT TOTALS ─────────────────────────────────
+    const receiptCount = dbItems.reduce((sum, item) => sum + (Number(item.Quantity) || 0), 0);
+    const settlementGatewayReference = gatewayReference || GatewayReference || null;
+    const cashIn = pMethod === "CASH" ? amount : 0;
+
+    await transaction.request()
+      .input("sid", sql.UniqueIdentifier, settlementId)
+      .input("payMode", sql.VarChar(50), pMethod)
+      .input("sysAmount", sql.Money, amount)
+      .input("manualAmount", sql.Money, amount)
+      .input("amountDiff", sql.Money, 0)
+      .input("receiptCount", sql.Numeric(18, 0), receiptCount)
+      .input("gatewayReference", sql.NVarChar(255), settlementGatewayReference)
+      .input("cashIn", sql.Numeric(18, 2), cashIn)
+      .input("cashOut", sql.Numeric(18, 2), 0)
+      .query(`
+        DELETE FROM SettlementTotalSales WHERE SettlementID = @sid;
+        DELETE FROM SettlementTranDetail WHERE SettlementID = @sid;
+
+        INSERT INTO SettlementTotalSales
+          (SettlementID, PayMode, SysAmount, ManualAmount, AmountDiff, ReceiptCount, GatewayReference)
+        VALUES
+          (@sid, @payMode, @sysAmount, @manualAmount, @amountDiff, @receiptCount, @gatewayReference);
+
+        INSERT INTO SettlementTranDetail
+          (SettlementID, PayMode, CashIn, CashOut)
+        VALUES
+          (@sid, @payMode, @cashIn, @cashOut);
+      `);
+    console.log(`✅ [PAYMENT] SettlementTotalSales and SettlementTranDetail updated: ${settlementId}`);
 
     // ── STEP 5: UPSERT SETTLEMENT ITEM DETAILS ──────────────────────────────
     // ✅ FIXED: Removed TotalAmount column and clear existing details if update

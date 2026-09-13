@@ -101,19 +101,15 @@ function App() {
   const [paymentDone, setPaymentDone] = useState(false);
   const [kioskThankYouOrderId, setKioskThankYouOrderId] = useState(null);
 
-  // Show the kiosk thank-you screen for 5s then reset to kiosk start page
-  const showKioskThankYou = (orderId) => {
-    setKioskThankYouOrderId(orderId);
-    setTimeout(() => {
-      // Clear all kiosk session data
-      localStorage.removeItem("kioskOrderId");
-      localStorage.removeItem("kioskOrderType");
-      localStorage.removeItem("orderId");
-      localStorage.setItem("returnToKioskStart", "true");
-      sessionStorage.removeItem("isLoggedIn");
-      // Hard reload to Kiosk Start Page
-      window.location.href = "/";
-    }, 5000);
+  const returnToKioskStartPage = () => {
+    localStorage.removeItem("kioskOrderId");
+    localStorage.removeItem("kioskOrderType");
+    localStorage.removeItem("orderId");
+    localStorage.removeItem("tableId");
+    localStorage.removeItem("tableNo");
+    localStorage.setItem("returnToKioskStart", "true");
+    sessionStorage.removeItem("isLoggedIn");
+    window.location.href = "/";
   };
   const [showCartPage, setShowCartPage] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -1134,8 +1130,7 @@ function App() {
 
       setTimeout(() => {
         if (isKiosk) {
-          // Kiosk: show thank-you screen for 5s then reset
-          showKioskThankYou(posOrderId);
+          returnToKioskStartPage();
         } else {
           window.location.href =
             `/settlement-success?tableId=${tableId}&table=${tableNo}&orderId=${posOrderId}`;
@@ -2753,8 +2748,7 @@ function App() {
 
                       const finalOrderId = currentOrderIdRef.current || currentOrderId;
                       if (isKiosk) {
-                        // Kiosk: show thank-you screen for 5s then reset
-                        showKioskThankYou(finalOrderId);
+                        returnToKioskStartPage();
                       } else {
                         window.location.href = `/settlement-success?tableId=${tableId}&table=${tableNo}&orderId=${finalOrderId}`;
                       }
