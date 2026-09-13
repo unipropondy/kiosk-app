@@ -7,9 +7,6 @@ const API = `${BASE_URL}/api`;
 export default function KioskStartPage({ onStart }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [serviceType, setServiceType] = useState(null);
-  const [tables, setTables] = useState([]);
-  const [showTablePicker, setShowTablePicker] = useState(false);
 
   const chooseService = async (orderType) => {
     setError("");
@@ -23,9 +20,9 @@ export default function KioskStartPage({ onStart }) {
       if (!Array.isArray(data.tables) || data.tables.length === 0) {
         throw new Error("No available service tables found.");
       }
-      setServiceType(orderType);
-      setTables(data.tables);
-      setShowTablePicker(true);
+
+      const selectedTable = data.tables[0];
+      await handleStart(orderType, selectedTable);
     } catch (err) {
       setError(err.message || "Unable to load service tables.");
     } finally {
@@ -33,9 +30,8 @@ export default function KioskStartPage({ onStart }) {
     }
   };
 
-  const handleStart = async (table) => {
+  const handleStart = async (orderType, table) => {
     setError("");
-    setLoading(true);
     try {
       // Generate a concurrency-safe sequential Kiosk Order Number from the backend.
       // No table assignment — the Kiosk is completely table-independent.
@@ -43,7 +39,7 @@ export default function KioskStartPage({ onStart }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          orderType: serviceType,
+          orderType,
           tableId: table.TableId,
           tableNo: table.TableNo,
         }),
@@ -57,7 +53,7 @@ export default function KioskStartPage({ onStart }) {
 
       // Store the selected service table for the next screen.
       localStorage.setItem("kioskOrderId", data.orderNumber);
-      localStorage.setItem("kioskOrderType", serviceType);
+      localStorage.setItem("kioskOrderType", orderType);
       localStorage.setItem("tableId", table.TableId);
       localStorage.setItem("tableNo", table.TableNo);
       localStorage.removeItem("orderId");
@@ -79,8 +75,6 @@ export default function KioskStartPage({ onStart }) {
       }
     } catch (err) {
       setError(err.message || "Something went wrong. Please try again.");
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -154,38 +148,6 @@ export default function KioskStartPage({ onStart }) {
         <div className="sp-loading-overlay">
           <div className="sp-spinner"></div>
           <div className="sp-loading-text">Preparing...</div>
-        </div>
-      )}
-      {showTablePicker && (
-        <div className="table-picker-overlay" role="dialog" aria-modal="true" aria-labelledby="table-picker-title">
-          <div className="table-picker-modal">
-            <button
-              type="button"
-              className="table-picker-close"
-              onClick={() => setShowTablePicker(false)}
-              aria-label="Close table selection"
-            >
-              x
-            </button>
-            <div className="table-picker-kicker">{serviceType === "CAR_WASH" ? "Car Wash" : "Detailing"}</div>
-            <h2 id="table-picker-title">Select your table</h2>
-            <p>Choose a table number to continue.</p>
-            <div className="table-picker-grid">
-              {tables.map((table) => (
-                <button
-                  type="button"
-                  className="table-picker-option"
-                  key={table.TableId}
-                  onClick={() => {
-                    setShowTablePicker(false);
-                    handleStart(table);
-                  }}
-                >
-                  {table.TableNo}
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
       )}
       {error && <div className="sp-error">{error}</div>}
