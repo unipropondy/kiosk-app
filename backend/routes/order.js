@@ -596,7 +596,7 @@ router.post("/save-cart", async (req, res) => {
 
 router.post("/send", async (req, res) => {
   try {
-    const { tableId, orderId, items, userId } = req.body;
+    const { tableId, orderId, items, userId, isKiosk } = req.body;
 
     console.log(
       "SYNC ITEMS:",
@@ -609,7 +609,9 @@ router.post("/send", async (req, res) => {
 
     const isGuid = /^[0-9a-fA-F-]{36}$/;
 
-    if (!isGuid.test(String(tableId))) {
+    if (isKiosk) {
+      actualTableId = null;
+    } else if (!isGuid.test(String(tableId))) {
 
       const tableLookup = await pool.request()
         .input("tableNo", sql.VarChar(50), String(tableId))
@@ -626,9 +628,9 @@ router.post("/send", async (req, res) => {
       actualTableId = tableLookup.recordset[0].TableId;
     }
 
-    const cleanId = String(actualTableId)
-      .replace(/^\{|\}$/g, "")
-      .trim();
+    const cleanId = actualTableId
+      ? String(actualTableId).replace(/^\{|\}$/g, "").trim()
+      : null;
 
     // const transaction = new sql.Transaction(pool);
     // await transaction.begin();
@@ -670,19 +672,28 @@ router.post("/send", async (req, res) => {
         status: (item.status === 'VOIDED' || item.StatusCode === 0) ? 'VOIDED' : (item.status || 'SENT')
       }));
 
-      const alreadySent = await pool.request()
-        .input("tableId", sql.UniqueIdentifier, cleanId)
-        .query(`
-          SELECT COUNT(*) AS cnt
-          FROM RestaurantOrderDetailCur d
-          JOIN RestaurantOrderCur h ON d.OrderId = h.OrderId
-          WHERE
-            (LTRIM(RTRIM(h.Tableno)) =
-                (SELECT LTRIM(RTRIM(TableNumber))
-                FROM TableMaster
-                WHERE TableId = @tableId))
-            AND d.StatusCode = 1
-        `);
+      const alreadySent = isKiosk && !cleanId
+        ? await pool.request()
+          .input("orderNo", sql.NVarChar(50), finalOrderId)
+          .query(`
+            SELECT COUNT(*) AS cnt
+            FROM RestaurantOrderDetailCur d
+            JOIN RestaurantOrderCur h ON d.OrderId = h.OrderId
+            WHERE h.OrderNumber = @orderNo AND d.StatusCode = 1
+          `)
+        : await pool.request()
+          .input("tableId", sql.UniqueIdentifier, cleanId)
+          .query(`
+            SELECT COUNT(*) AS cnt
+            FROM RestaurantOrderDetailCur d
+            JOIN RestaurantOrderCur h ON d.OrderId = h.OrderId
+            WHERE
+              (LTRIM(RTRIM(h.Tableno)) =
+                  (SELECT LTRIM(RTRIM(TableNumber))
+                  FROM TableMaster
+                  WHERE TableId = @tableId))
+              AND d.StatusCode = 1
+          `);
 
       if (alreadySent.recordset[0].cnt === 0) {
         return res.json({
@@ -701,18 +712,20 @@ router.post("/send", async (req, res) => {
       );
 
       // 4. Lock Table to the new ID
-      await pool.request()
-        .input("tid", sql.UniqueIdentifier, cleanId)
-        .input("oid", sql.NVarChar(50), finalOrderId)
-        .query(`
-          UPDATE TableMaster 
-          SET Status = 1, 
-              entry_status ='q',
-              CurrentOrderId = @oid,
-              StartTime = CASE WHEN StartTime IS NULL OR StartTime < '2000-01-01' THEN GETDATE() ELSE StartTime END,
-              ModifiedOn = GETDATE()
-          WHERE TableId = @tid
-        `);
+      if (cleanId) {
+        await pool.request()
+          .input("tid", sql.UniqueIdentifier, cleanId)
+          .input("oid", sql.NVarChar(50), finalOrderId)
+          .query(`
+            UPDATE TableMaster 
+            SET Status = 1, 
+                entry_status ='q',
+                CurrentOrderId = @oid,
+                StartTime = CASE WHEN StartTime IS NULL OR StartTime < '2000-01-01' THEN GETDATE() ELSE StartTime END,
+                ModifiedOn = GETDATE()
+            WHERE TableId = @tid
+          `);
+      }
 
       //   await transaction.commit();
 
@@ -720,7 +733,7 @@ router.post("/send", async (req, res) => {
 
       // 🔥 REAL-TIME BROADCAST: Notify KDS and all other Waiter devices
       const io = req.app.get("io");
-      if (io) {
+      if (io && cleanId) {
         io.emit("new_order", {
           orderId: finalOrderId,
           context: {
@@ -737,7 +750,7 @@ router.post("/send", async (req, res) => {
       }
 
       // 5. Refresh totals and notify instantly
-      syncTableStatus(req, cleanId).catch(() => { });
+      if (cleanId) syncTableStatus(req, cleanId).catch(() => { });
     } catch (e) {
       //   await transaction.rollback(); 
       console.error("❌ FULL SEND ERROR:", e);
