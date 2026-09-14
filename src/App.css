@@ -1043,6 +1043,18 @@ body {
   box-shadow: 0 15px 35px rgba(0,0,0,0.15);
 }
 
+.paynow-card {
+  width: 220px;
+  height: 220px;
+  padding: 30px 20px;
+  border-radius: 16px;
+}
+
+.paynow-card .payment-mode-label {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
 .payment-mode-icons {
   flex: 1;
   display: flex;
@@ -1558,7 +1570,7 @@ body {
 }
 
 .line-solid {
-  width: 16px;
+  width: 4px;
   height: 2px;
   background-color: #f97316;
   border-radius: 2px;

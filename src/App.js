@@ -2706,7 +2706,7 @@ function App() {
 
                   <div className="payment-options-row">
                     {/* Card 1 */}
-                    <div className="payment-mode-card" onClick={() => {
+                    <div className="payment-mode-card paynow-card" onClick={() => {
                       setShowPaymentPopup(false);
                       handlePayOnline();
                     }}>
@@ -2716,7 +2716,7 @@ function App() {
                         <AmexBrand />
                         <JcbBrand />
                       </div>
-                      <div className="payment-mode-label">Credit/Debit<br />Card</div>
+                      <div className="payment-mode-label">PayNow</div>
                     </div>
 
 
