@@ -83,6 +83,7 @@ function App() {
   useViewportVariables();
 
   const skipSaveRef = useRef(false);
+  const cartHydratedRef = useRef(false);
   const deleteInProgressRef = useRef(false);
   const actionRef = useRef(""); // "INSERT", "UPDATE", "DELETE"
   const pendingSaveRef = useRef(null); // tracks in-flight saveCartToBackend promise
@@ -299,7 +300,11 @@ function App() {
     if (restoredTableId) {
       localStorage.setItem("tableId", restoredTableId);
       setTableId(restoredTableId);
-      loadCart(restoredTableId);
+      loadCart(restoredTableId).finally(() => {
+        cartHydratedRef.current = true;
+      });
+    } else {
+      cartHydratedRef.current = true;
     }
 
   }, []);
@@ -307,6 +312,9 @@ function App() {
   useEffect(() => {
     // Allow save when: (a) in kiosk mode, OR (b) a table is assigned (tableNo is set)
     if (!isKiosk && !tableNo) return;
+
+    // Do not overwrite the database with the initial empty state while the cart is loading.
+    if (!cartHydratedRef.current) return;
 
     // ✅ FIX: Do not save cart after payment is completed
     if (paymentDone) return;
@@ -685,7 +693,16 @@ return basePrice + totalSurcharge + modifierPriceTotal;
     });
 
     const modifierPriceTotal = chosenModifiers.reduce((sum, m) => sum + (Number(m.Price) || 0), 0);
-    const finalPrice = (Number(comboConfig.basePrice) || 0) + totalSurcharge + modifierPriceTotal;
+    // const finalPrice = (Number(comboConfig.basePrice) || 0) + totalSurcharge + modifierPriceTotal;
+    const comboBasePrice = Number(comboConfig.basePrice);
+const dishBasePrice = Number(
+  selectedDish?.Price ?? selectedDish?.price ?? 0
+);
+
+const finalPrice =
+  (comboBasePrice > 0 ? comboBasePrice : dishBasePrice)
+  + totalSurcharge
+  + modifierPriceTotal;
     console.log("chosenModifiers:", chosenModifiers);
     const newCartItem = {
       ...selectedDish,
@@ -2258,10 +2275,26 @@ return basePrice + totalSurcharge + modifierPriceTotal;
                 <div className="cart-bar-left">
                   <button
                     className="cart-bar-clear-btn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setCart([]);
-                    }}
+                   onClick={async (e) => {
+  e.stopPropagation();
+
+  const orderId = currentOrderIdRef.current || currentOrderId;
+
+  if (orderId) {
+    await fetch(`${API}/order/clear-cart`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        orderId: orderId,
+      }),
+    });
+  }
+
+  skipSaveRef.current = true;
+  setCart([]);
+}}
                   >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
                       <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6" />
