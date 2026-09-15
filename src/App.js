@@ -625,7 +625,15 @@ function App() {
       .filter(m => selectedComboModifierIds.includes(String(m.ModifierID || m.ModifierId || "")));
     const modifierPriceTotal = chosenModifiers.reduce((sum, m) => sum + (Number(m.Price) || 0), 0);
 
-    return (Number(comboConfig.basePrice) || 0) + totalSurcharge + modifierPriceTotal;
+    // return (Number(comboConfig.basePrice) || 0) + totalSurcharge + modifierPriceTotal;
+    const basePrice = Number(
+      comboConfig.basePrice ||
+      selectedDish?.Price ||
+      selectedDish?.price ||
+      0
+    );
+
+    return basePrice + totalSurcharge + modifierPriceTotal;
   };
 
   const handleAddComboToCart = () => {
@@ -2752,14 +2760,7 @@ function App() {
                         (sum, m) => sum + Number(m.Price || 0),
                         0
                       );
-                      const basePrice = Number(
-                        selectedDish?.Price ??
-                        selectedDish?.price ??
-                        selectedDish?.PricePerUnit ??
-                        selectedDish?.amount ??
-                        selectedDish?.DishPrice ??
-                        0
-                      );
+                      const basePrice = Number(selectedDish.Price || 0);
                       return ((basePrice + extra) * comboQty).toFixed(2);
                     })()}
                   </button>
