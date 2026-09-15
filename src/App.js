@@ -1579,9 +1579,10 @@ function App() {
 
         skipSaveRef.current = true;
         setCart(prev => {
-          const dbIds = new Set(
-            fromDB.map(i => i.OrderDetailId || i.lineItemId).filter(Boolean)
-          );
+          if (fromDB.length === 0 && prev.length > 0 && actionRef.current !== "DELETE") {
+            console.log("⚠️ loadCart returned 0 items while local items exist — preserving local cart");
+            return prev;
+          }
           const localOnly = prev.filter(
             item =>
               !item.OrderDetailId &&
