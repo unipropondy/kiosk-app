@@ -2789,7 +2789,14 @@ function App() {
                         (sum, m) => sum + Number(m.Price || 0),
                         0
                       );
-                      const basePrice = Number(selectedDish.Price || 0);
+                      const basePrice = Number(
+                        selectedDish?.Price ??
+                        selectedDish?.price ??
+                        selectedDish?.PricePerUnit ??
+                        selectedDish?.amount ??
+                        selectedDish?.DishPrice ??
+                        0
+                      );
                       return ((basePrice + extra) * comboQty).toFixed(2);
                     })()}
                   </button>
