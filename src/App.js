@@ -501,7 +501,9 @@ function App() {
       const mods = await res.json();
       console.log("Modifiers:", mods);
 
-      if (Array.isArray(mods) && mods.length > 0) {
+      const realMods = Array.isArray(mods) ? mods.filter((m) => m.ModifierName?.toUpperCase() !== "OPEN") : [];
+
+      if (realMods.length > 0) {
         setSelectedDish(dish);
         setModifiers(mods);
         setSelectedModifierIds([]);
@@ -844,6 +846,15 @@ function App() {
         );
       }
 
+      const basePrice = Number(
+        dish?.Price ??
+        dish?.price ??
+        dish?.PricePerUnit ??
+        dish?.amount ??
+        dish?.DishPrice ??
+        0
+      );
+
       // new item
       return [
         ...prev,
@@ -855,7 +866,9 @@ function App() {
 
           selectedMods: [],
 
-          finalPrice: Number(dish.Price || 0),
+          finalPrice: basePrice,
+          Price: basePrice,
+          price: basePrice,
           status: "NEW",
         }
       ];
