@@ -841,19 +841,6 @@ function App() {
           item.status !== "SENT"
       );
 
-      // already exists
-      if (existing) {
-        return prev.map((item) =>
-          (item.DishId || item.id) === dish.DishId
-            ? {
-              ...item,
-              qty: (item.qty || 1) + 1,
-              status: "NEW",
-            }
-            : item
-        );
-      }
-
       const basePrice = Number(
         dish?.Price ??
         dish?.price ??
@@ -862,6 +849,22 @@ function App() {
         dish?.DishPrice ??
         0
       );
+
+      // already exists
+      if (existing) {
+        return prev.map((item) =>
+          (item.DishId || item.id) === dish.DishId
+            ? {
+              ...item,
+              qty: (item.qty || 1) + 1,
+              finalPrice: item.finalPrice || item.Price || item.price || basePrice,
+              Price: item.Price || item.price || basePrice,
+              price: item.price || item.Price || basePrice,
+              status: "NEW",
+            }
+            : item
+        );
+      }
 
       // new item
       return [
@@ -1705,6 +1708,9 @@ function App() {
             ? {
               ...item,
               qty: (item.qty || 1) + comboQty,
+              finalPrice: item.finalPrice || finalPrice,
+              Price: item.Price || finalPrice,
+              price: item.price || finalPrice,
               status: "NEW",
             }
             : item
