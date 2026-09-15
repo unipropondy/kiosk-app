@@ -1263,7 +1263,15 @@ function App() {
           id: item.DishId || item.id,
           name: item.Name || item.name,
           qty: item.qty || 1,
-          price: item.Price || item.price || 0,
+          price: Number(
+            item.finalPrice ??
+            item.Price ??
+            item.price ??
+            item.PricePerUnit ??
+            item.amount ??
+            item.DishPrice ??
+            0
+          ),
           modifiers: (item.selectedMods || [])
             .filter((m) =>
               /^[0-9a-fA-F-]{36}$/.test(m.ModifierID || m.ModifierId)
@@ -1963,10 +1971,21 @@ function App() {
   };
 
   // Subtotal — sum of all cart items
+  const getItemPrice = (item) =>
+    Number(
+      item?.finalPrice ??
+      item?.Price ??
+      item?.price ??
+      item?.PricePerUnit ??
+      item?.amount ??
+      item?.DishPrice ??
+      0
+    );
+
   const subTotal = cart.reduce(
     (sum, item) =>
       sum +
-      Number(item.Price || item.price || 0) *
+      getItemPrice(item) *
       Number(item.qty || 1),
     0
   );
@@ -1976,7 +1995,7 @@ function App() {
     (sum, item) =>
       Number(item.isServiceCharge || 0) === 1
         ? sum +
-        Number(item.Price || item.price || 0) *
+        getItemPrice(item) *
         Number(item.qty || 1)
         : sum,
     0
@@ -2451,7 +2470,7 @@ function App() {
                           <div className="ci-price">
                             $
                             {(
-                              Number(item.Price || item.price || 0) *
+                              getItemPrice(item) *
                               Number(item.qty || 1)
                             ).toFixed(2)}
                           </div>
