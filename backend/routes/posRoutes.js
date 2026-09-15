@@ -131,7 +131,7 @@ router.get("/dishes/all", async (req, res) => {
         SELECT *, ROW_NUMBER() OVER(PARTITION BY KitchenTypeValue ORDER BY PrinterId) as rn 
         FROM PrintMaster WHERE IsActive = 1 AND PrinterType = 2
       ) pm ON CAST(ckt.KitchenTypeCode AS INT) = pm.KitchenTypeValue AND pm.rn = 1
-      WHERE d.IsActive = 1 AND ISNULL(d.IsPublished,0) = 0 ORDER BY d.Name ASC
+      WHERE d.IsActive = 1 AND ISNULL(d.IsPublished,0) = 0 ORDER BY d.SordCode ASC
     `);
     setCache(cacheKey, result.recordset);
     res.json(result.recordset);
@@ -154,6 +154,7 @@ router.get("/dishes/group/:DishGroupId", async (req, res) => {
       SELECT DISTINCT
               d.DishId,
               d.Name,
+               d.SordCode, d.SordCode,
               d.DishGroupId,
               d.currentcost AS Price,
               d.DishCode,
@@ -201,7 +202,7 @@ router.get("/dishes/group/:DishGroupId", async (req, res) => {
                 OR dmap.DishGroupId = @DishGroupId
               )
  
-          ORDER BY d.Name ASC
+          ORDER BY d.SordCode ASC
       `);
     setCache(cacheKey, result.recordset);
     res.json(result.recordset);
