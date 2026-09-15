@@ -434,9 +434,11 @@ function App() {
     dish.Name?.toLowerCase().includes(search.toLowerCase())
   );
 
-  const heroDescription = dishes
-    .map((dish) => String(dish?.Description ?? dish?.description ?? "").trim())
-    .find(Boolean) || "No description available.";
+  // const heroDescription = dishes
+  //   .map((dish) => String(dish?.Description ?? dish?.description ?? "").trim())
+  //   .find(Boolean) || "No description available.";
+
+  const heroDescription = "Choose a package for your vehicle";
 
   // When dishes change, pre-fetch modifier status for all of them in parallel
   useEffect(() => {
