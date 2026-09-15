@@ -859,8 +859,9 @@ router.get("/cart/kiosk/:orderId", async (req, res) => {
         FROM RestaurantOrderDetailCur d
         JOIN RestaurantOrderCur h ON d.OrderId = h.OrderId
         LEFT JOIN DishMaster dish ON d.DishId = dish.DishId
-        WHERE h.OrderNumber = @oid AND (h.isOrderClosed = 0 OR h.isOrderClosed IS NULL)
-        AND d.StatusCode <> 0
+        WHERE (h.OrderNumber = @oid OR d.OrderNumber = @oid OR CONVERT(varchar(50), h.OrderId) = @oid)
+          AND (h.isOrderClosed = 0 OR h.isOrderClosed IS NULL)
+          AND d.StatusCode <> 0
       `);
     return res.json({ items: itemsResult.recordset || [], currentOrderId: cleanOrderId });
   } catch (err) {

@@ -1513,6 +1513,10 @@ function App() {
 
         skipSaveRef.current = true;
         setCart(prev => {
+          if (fromDB.length === 0 && prev.length > 0) {
+            console.log("⚠️ loadCart returned 0 items from DB — retaining existing local cart items");
+            return prev;
+          }
           const dbIds = new Set(
             fromDB.map(i => i.OrderDetailId || i.lineItemId).filter(Boolean)
           );
