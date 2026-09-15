@@ -297,9 +297,11 @@ function App() {
       setTableNo(restoredTableNo);
     }
 
-    if (restoredTableId) {
-      localStorage.setItem("tableId", restoredTableId);
-      setTableId(restoredTableId);
+    if (restoredTableId || (isKiosk && currentOrderId)) {
+      if (restoredTableId) {
+        localStorage.setItem("tableId", restoredTableId);
+        setTableId(restoredTableId);
+      }
       loadCart(restoredTableId).finally(() => {
         cartHydratedRef.current = true;
       });
