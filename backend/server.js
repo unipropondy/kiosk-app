@@ -43,6 +43,9 @@ app.use("/api/combo", comboRoutes);
 const authRoutes = require("./routes/auth");
 app.use("/api/auth", authRoutes);
 
+const yeahpayRoutes = require("./routes/yeahpayRoutes");
+app.use("/api/yeahpay", yeahpayRoutes);
+
 app.get("/", (req, res) => {
   res.send("POS Backend Running");
 });

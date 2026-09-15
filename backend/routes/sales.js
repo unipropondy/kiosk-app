@@ -86,6 +86,7 @@ const parseCsv = (value) => String(value || "")
 const normalizePayMode = (paymentMethod = "CASH") => {
   const raw = String(paymentMethod || "CASH").toUpperCase().trim();
   
+  if (raw.includes("YEAHPAY")) return "YEAHPAY";
   if (raw.includes("CASH") || raw === "CAS") return "CASH";
   if (raw.includes("CARD") || raw.includes("VISA") || raw.includes("MASTER") || raw.includes("AMEX") || raw.includes("DINERS")) return "CARD";
   if (raw.includes("PAYNOW") || raw.includes("GRAB") || raw.includes("FOODPANDA")) return "PAYNOW";

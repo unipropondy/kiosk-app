@@ -561,19 +561,22 @@ router.post("/save-cart", async (req, res) => {
 
       // 🚀 CRITICAL: Update TableMaster INSIDE the same transaction 
       // await transaction.request()
-      await pool.request()
-        .input("tid", sql.UniqueIdentifier, cleanId)
-        .input("oid", sql.NVarChar(50), currentOrderId)
-        .query(`
-          UPDATE TableMaster 
-          SET Status = CASE WHEN @oid IS NOT NULL THEN 1 ELSE 0 END, 
-              CurrentOrderId = @oid,
-               entry_status = 'q',
-              StartTime = CASE WHEN @oid IS NOT NULL AND (StartTime IS NULL OR StartTime < '2000-01-01') THEN GETDATE() 
-                               WHEN @oid IS NULL THEN NULL 
-                               ELSE StartTime END
-          WHERE TableId = @tid
-        `);
+      const isGuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(cleanId);
+      if (isGuid) {
+        await pool.request()
+          .input("tid", sql.UniqueIdentifier, cleanId)
+          .input("oid", sql.NVarChar(50), currentOrderId)
+          .query(`
+            UPDATE TableMaster 
+            SET Status = CASE WHEN @oid IS NOT NULL THEN 1 ELSE 0 END, 
+                CurrentOrderId = @oid,
+                 entry_status = 'q',
+                StartTime = CASE WHEN @oid IS NOT NULL AND (StartTime IS NULL OR StartTime < '2000-01-01') THEN GETDATE() 
+                                 WHEN @oid IS NULL THEN NULL 
+                                 ELSE StartTime END
+            WHERE TableId = @tid
+          `);
+      }
 
       // await transaction.commit();
 
@@ -767,6 +770,10 @@ router.get("/cart/:tableId", async (req, res) => {
     }
     const pool = await poolPromise;
     const cleanId = tableId.replace(/^\{|\}$/g, "").trim();
+    const isGuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(cleanId);
+    if (!isGuid) {
+      return res.json({ items: [], currentOrderId: null });
+    }
 
     // Get table info (TableNumber + CurrentOrderId)
     const tableInfo = await pool.request()
@@ -834,6 +841,29 @@ ORDER BY d.CreatedOn ASC
 
     res.json({ items, currentOrderId: isRealOrderId ? currentOrderId : null });
   } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.get("/cart/kiosk/:orderId", async (req, res) => {
+  try {
+    const rawOrderId = req.params.orderId || "";
+    if (!rawOrderId || rawOrderId === "null" || rawOrderId === "undefined") {
+      return res.json({ items: [], currentOrderId: null });
+    }
+    const cleanOrderId = String(rawOrderId).split(":")[0].trim();
+    const pool = await poolPromise;
+    const itemsResult = await pool.request()
+      .input("oid", sql.NVarChar(100), cleanOrderId)
+      .query(`
+        SELECT d.*, dish.Name, dish.Price, dish.isServiceCharge
+        FROM RestaurantOrderDetailCur d
+        JOIN RestaurantOrderCur h ON d.OrderId = h.OrderId
+        LEFT JOIN DishMaster dish ON d.DishId = dish.DishId
+        WHERE h.OrderNumber = @oid AND (h.isOrderClosed = 0 OR h.isOrderClosed IS NULL)
+      `);
+    return res.json({ items: itemsResult.recordset || [], currentOrderId: cleanOrderId });
+  } catch (err) {
+    return res.json({ items: [], currentOrderId: req.params.orderId });
+  }
 });
 
 router.post("/cancel", async (req, res) => {

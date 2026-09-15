@@ -133,6 +133,11 @@ function App() {
   const [showOnlinePayment, setShowOnlinePayment] = useState(false);
   const [showPayNowModal, setShowPayNowModal] = useState(false);
   const [showUpiModal, setShowUpiModal] = useState(false);
+  const [showYeahPayModal, setShowYeahPayModal] = useState(false);
+  const [yeahPayStatus, setYeahPayStatus] = useState("INIT"); // INIT, PROCESSING, SUCCESS, FAILED
+  const [yeahPayMsg, setYeahPayMsg] = useState("");
+  const [yeahPayDetails, setYeahPayDetails] = useState(null);
+  const [yeahPayPayableAmount, setYeahPayPayableAmount] = useState("0.00");
   const [successMessage, setSuccessMessage] = useState("");
   const [enableKotQr, setEnableKotQr] = useState(0);
   const [enableCombo, setEnableCombo] = useState(0);
@@ -1055,6 +1060,101 @@ function App() {
     window.addEventListener('message', handleMessage);
   };
 
+  const handleYeahPayPayment = async (payWay = "CARD") => {
+    const cartItems = cart && cart.length ? cart : [];
+    const cartSub = cartItems.reduce((sum, item) => sum + (Number(item.Price || item.price || 0) * Number(item.qty || 1)), 0);
+    const calcTotal = Number(totalAmount || 0);
+    const lockedTotal = Number(yeahPayPayableAmount || 0);
+    const validAmount = (cartSub > 0 ? cartSub : (calcTotal > 0 ? calcTotal : (lockedTotal > 0 ? lockedTotal : 20))).toFixed(2);
+    setYeahPayPayableAmount(validAmount);
+
+    const action = payWay === "PAYNOW" ? "TRADE.QRCODE.PayNowPay" : "TRADE.CARD.CONSUME";
+
+    setShowPaymentPopup(false);
+    setShowYeahPayModal(true);
+    setYeahPayStatus("PROCESSING");
+    setYeahPayMsg(payWay === "PAYNOW" ? "Initiating PayNow QR on YeahPay Terminal..." : "Initiating YeahPay Cloud POS terminal transaction...");
+    setYeahPayDetails(null);
+
+    const bizOrderId = currentOrderId || `YP${Date.now()}`;
+
+    try {
+      const res = await fetch(`${API}/yeahpay/pay`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: validAmount,
+          bizOrderId: bizOrderId,
+          action: action,
+          payWay: payWay
+        })
+      });
+
+      const data = await res.json();
+      console.log("💳 YeahPay Pay API Response:", data);
+
+      if (data.success || data.status === 104) {
+        setYeahPayStatus("SUCCESS");
+        setYeahPayMsg("Transaction Approved by YeahPay Terminal!");
+        setYeahPayDetails(data);
+
+        setTimeout(() => {
+          completeOrder(bizOrderId, validAmount);
+        }, 1200);
+      } else if (data.status === 103 || data.code === "0") {
+        setYeahPayMsg(payWay === "PAYNOW" ? "Please scan PayNow QR code on YeahPay Terminal screen..." : "Please tap or insert card on YeahPay Terminal...");
+        
+        let pollCount = 0;
+        const maxPolls = 45;
+        const pollInterval = setInterval(async () => {
+          pollCount++;
+          if (pollCount > maxPolls) {
+            clearInterval(pollInterval);
+            setYeahPayStatus("FAILED");
+            setYeahPayMsg("Payment timeout on POS terminal. Please try again.");
+            return;
+          }
+
+          try {
+            const queryRes = await fetch(`${API}/yeahpay/query`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ bizOrderId })
+            });
+
+            const queryData = await queryRes.json();
+            console.log("🔍 YeahPay Query Status:", queryData);
+
+            if (queryData.success || queryData.status === 104 || queryData.status === 11 || queryData.status === 2) {
+              clearInterval(pollInterval);
+              setYeahPayStatus("SUCCESS");
+              setYeahPayMsg("Transaction Approved by YeahPay Terminal!");
+              setYeahPayDetails(queryData);
+
+              setTimeout(() => {
+                completeOrder(bizOrderId, validAmount);
+              }, 1200);
+            } else if (queryData.status === 105 || queryData.status === -1) {
+              clearInterval(pollInterval);
+              setYeahPayStatus("FAILED");
+              setYeahPayMsg(queryData.msg || "Payment Failed or Cancelled on POS terminal.");
+            }
+          } catch (e) {
+            console.error("YeahPay query error:", e);
+          }
+        }, 2000);
+
+      } else {
+        setYeahPayStatus("FAILED");
+        setYeahPayMsg(data.msg || "Failed to initiate payment on YeahPay terminal.");
+      }
+    } catch (err) {
+      console.error("handleYeahPayPayment Error:", err);
+      setYeahPayStatus("FAILED");
+      setYeahPayMsg(err.message || "Network error connecting to YeahPay gateway.");
+    }
+  };
+
   // const completeOrder = async (orderId, amount) => {
   //     try {
   //         const res = await fetch(`${API}/sales/save`, {
@@ -1406,8 +1506,11 @@ function App() {
           }
         }
 
-        const totalAmount =
+        const calculatedOrderTotal =
           cart.reduce((s, i) => s + (Number(i.Price || i.price || 0) * Number(i.qty || 1)), 0).toFixed(2);
+        if (Number(calculatedOrderTotal) > 0) {
+          setYeahPayPayableAmount(calculatedOrderTotal);
+        }
         setShowPaymentPopup(true);
       }
       else {
@@ -2707,11 +2810,33 @@ function App() {
                 </button>
 
                 <div className="full-screen-payment-content">
-                  <h1 className="payment-total-text">TOTAL: ${subTotal}</h1>
+                  <h1 className="payment-total-text">TOTAL: ${Number(totalAmount) > 0 ? totalAmount : yeahPayPayableAmount}</h1>
                   <h2 className="payment-choose-text">Choose your payment mode</h2>
 
                   <div className="payment-options-row">
-                    {/* Card 1 */}
+                    {/* Card 1: YeahPay Cloud POS - Card */}
+                    <div className="payment-mode-card paynow-card" style={{ borderColor: '#3b82f6', background: '#eff6ff' }} onClick={() => {
+                      handleYeahPayPayment("CARD");
+                    }}>
+                      <div className="payment-mode-icons grid-icons">
+                        <MastercardBrand />
+                        <VisaBrand />
+                        <AmexBrand />
+                      </div>
+                      <div className="payment-mode-label" style={{ color: '#1d4ed8' }}>YeahPay Terminal (Card)</div>
+                    </div>
+
+                    {/* Card 2: YeahPay Cloud POS - PayNow */}
+                    <div className="payment-mode-card paynow-card" style={{ borderColor: '#ec4899', background: '#fdf2f8' }} onClick={() => {
+                      handleYeahPayPayment("PAYNOW");
+                    }}>
+                      <div className="payment-mode-icons grid-icons">
+                        <PayNowBrand />
+                      </div>
+                      <div className="payment-mode-label" style={{ color: '#be185d' }}>YeahPay Terminal (PayNow)</div>
+                    </div>
+
+                    {/* Card 3: PayNow Gateway (Online) */}
                     <div className="payment-mode-card paynow-card" onClick={() => {
                       setShowPaymentPopup(false);
                       handlePayOnline();
@@ -2722,10 +2847,8 @@ function App() {
                         <AmexBrand />
                         <JcbBrand />
                       </div>
-                      <div className="payment-mode-label">PayNow</div>
+                      <div className="payment-mode-label">PayNow (Gateway)</div>
                     </div>
-
-
 
                     {/* Card 3 */}
                     <div className="payment-mode-card" onClick={async () => {
@@ -2770,6 +2893,105 @@ function App() {
                       </div>
                       <div className="payment-mode-label">Cash/EZ Link</div>
                     </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* YEHPAY CLOUD POS TERMINAL MODAL */}
+            {showYeahPayModal && (
+              <div className="modal-overlay" style={{ zIndex: 10002 }}>
+                <div style={{
+                  background: "white",
+                  borderRadius: "24px",
+                  padding: "32px",
+                  maxWidth: "480px",
+                  width: "90%",
+                  textAlign: "center",
+                  boxShadow: "0 20px 40px rgba(0,0,0,0.2)",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: "20px",
+                  animation: "fadeIn 0.3s ease"
+                }}>
+                  <div style={{
+                    width: "64px",
+                    height: "64px",
+                    borderRadius: "50%",
+                    background: yeahPayStatus === "SUCCESS" ? "#10b981" : yeahPayStatus === "FAILED" ? "#ef4444" : "#3b82f6",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "white",
+                    fontSize: "28px",
+                    fontWeight: "bold"
+                  }}>
+                    {yeahPayStatus === "SUCCESS" ? "✓" : yeahPayStatus === "FAILED" ? "✕" : "💳"}
+                  </div>
+
+                  <div>
+                    <h2 style={{ margin: "0 0 8px 0", fontSize: "22px", color: "#1e293b" }}>YeahPay Cloud Terminal</h2>
+                    <p style={{ margin: 0, fontSize: "14px", color: "#64748b" }}>Thermal Buddy Gateway</p>
+                  </div>
+
+                  <div style={{
+                    background: "#f8fafc",
+                    borderRadius: "16px",
+                    padding: "16px 24px",
+                    width: "100%",
+                    border: "1px solid #e2e8f0"
+                  }}>
+                    <div style={{ fontSize: "12px", color: "#64748b", textTransform: "uppercase" }}>Amount Payable</div>
+                    <div style={{ fontSize: "32px", fontWeight: "bold", color: "#0f172a" }}>${yeahPayPayableAmount}</div>
+                  </div>
+
+                  <div style={{ fontSize: "15px", fontWeight: "500", color: yeahPayStatus === "FAILED" ? "#ef4444" : "#334155" }}>
+                    {yeahPayMsg}
+                  </div>
+
+                  {yeahPayStatus === "PROCESSING" && (
+                    <div style={{
+                      display: "inline-block",
+                      width: "36px",
+                      height: "36px",
+                      border: "4px solid #e2e8f0",
+                      borderTopColor: "#3b82f6",
+                      borderRadius: "50%",
+                      animation: "spin 1s linear infinite"
+                    }}></div>
+                  )}
+
+                  {yeahPayDetails && (
+                    <div style={{ fontSize: "12px", color: "#64748b", textAlign: "left", width: "100%", background: "#f1f5f9", padding: "12px", borderRadius: "8px" }}>
+                      <div><strong>Trace ID:</strong> {yeahPayDetails.traceId || "N/A"}</div>
+                      <div><strong>Pay Way:</strong> {yeahPayDetails.payWay || "Card/QR"}</div>
+                      <div><strong>Card No:</strong> {yeahPayDetails.cardNo || "****"}</div>
+                      <div><strong>Ref No:</strong> {yeahPayDetails.referenceNo || "N/A"}</div>
+                    </div>
+                  )}
+
+                  <div style={{ display: "flex", gap: "12px", width: "100%", marginTop: "8px" }}>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await fetch(`${API}/yeahpay/cancel`, { method: "POST" });
+                        } catch (e) {}
+                        setShowYeahPayModal(false);
+                      }}
+                      style={{
+                        flex: 1,
+                        padding: "14px",
+                        borderRadius: "12px",
+                        border: "1px solid #cbd5e1",
+                        background: "#f8fafc",
+                        color: "#475569",
+                        fontWeight: "600",
+                        cursor: "pointer"
+                      }}
+                    >
+                      {yeahPayStatus === "SUCCESS" ? "Close" : "Cancel Payment"}
+                    </button>
                   </div>
                 </div>
               </div>
