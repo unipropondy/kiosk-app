@@ -122,12 +122,12 @@ function App() {
 
   const [activeCategory, setActiveCategory] = useState(null);
   const [activeGroup, setActiveGroup] = useState(null);
-  const [tableNo, setTableNo] = useState("");
-  const [tableId, setTableId] = useState("");
+  const [tableNo, setTableNo] = useState(() => localStorage.getItem("tableNo") || "");
+  const [tableId, setTableId] = useState(() => localStorage.getItem("tableId") || "");
   // Kiosk mode: true when the user arrived via the Kiosk start page (no table)
   const [isKiosk, setIsKiosk] = useState(() => !!localStorage.getItem("kioskOrderId"));
 
-  const [currentOrderId, setCurrentOrderId] = useState(null);
+  const [currentOrderId, setCurrentOrderId] = useState(() => localStorage.getItem("kioskOrderId") || null);
 
   const [showPaymentPopup, setShowPaymentPopup] = useState(false);
   const [showOnlinePayment, setShowOnlinePayment] = useState(false);
@@ -281,14 +281,20 @@ function App() {
       setIsLoggedIn(false);
     }
 
+    const restoredTableId = tid || oldTableId || "";
+    const restoredTableNo = table || localStorage.getItem("tableNo") || "";
+
     if (table) {
       setTableNo(table);
+      localStorage.setItem("tableNo", table);
+    } else if (restoredTableNo) {
+      setTableNo(restoredTableNo);
     }
 
-    if (tid) {
-      localStorage.setItem("tableId", tid);
-      setTableId(tid);
-      loadCart(tid);
+    if (restoredTableId) {
+      localStorage.setItem("tableId", restoredTableId);
+      setTableId(restoredTableId);
+      loadCart(restoredTableId);
     }
 
   }, []);
@@ -2127,7 +2133,7 @@ function App() {
                         <div className="new-kiosk-dish-info">
                           <div className="new-kiosk-dish-name">{dish.Name}</div>
                           <div className="new-kiosk-dish-desc">
-                            { "Premium Car Care. Exceptional Service."}
+                            { dish.Description ||"Premium Car Care. Exceptional Service."}
                           </div>
                           <div className="new-kiosk-dish-price">
                             ${Number(dish.Price || 0).toFixed(2)}
