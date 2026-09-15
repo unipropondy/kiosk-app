@@ -1602,7 +1602,7 @@ function App() {
     );
 
     const finalPrice =
-      Number(selectedDish.Price || 0) +
+      Number(selectedDish?.Price || selectedDish?.price || 0) +
       Number(extra);
 
     setCart((prev) => {
