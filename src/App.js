@@ -409,7 +409,7 @@ function App() {
       const res = await fetch(`${API}/dishes/group/${groupId}`);
       const data = await res.json();
       console.log(JSON.stringify(data, null, 2));
-      setDishes(data);
+      setDishes(Array.isArray(data) ? data : []);
     } catch (err) {
       console.log(err);
     }
