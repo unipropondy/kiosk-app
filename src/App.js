@@ -1322,6 +1322,8 @@ function App() {
                     changed = true;
                     return {
                       ...item,
+                      price: item.price || item.Price || Number(match.price || match.Price || 0),
+                      Price: item.Price || item.price || Number(match.Price || match.price || 0),
                       OrderDetailId: match.OrderDetailId || match.lineItemId,
                       lineItemId: match.OrderDetailId || match.lineItemId
                     };
@@ -1412,6 +1414,8 @@ function App() {
                       changed = true;
                       return {
                         ...item,
+                        price: item.price || item.Price || Number(match.price || match.Price || 0),
+                        Price: item.Price || item.price || Number(match.Price || match.price || 0),
                         OrderDetailId: match.OrderDetailId || match.lineItemId,
                         lineItemId: match.OrderDetailId || match.lineItemId
                       };
