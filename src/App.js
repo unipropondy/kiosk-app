@@ -1601,9 +1601,16 @@ function App() {
       0
     );
 
-    const finalPrice =
-      Number(selectedDish?.Price || selectedDish?.price || 0) +
-      Number(extra);
+    const baseDishPrice = Number(
+      selectedDish?.Price ??
+      selectedDish?.price ??
+      selectedDish?.PricePerUnit ??
+      selectedDish?.amount ??
+      selectedDish?.DishPrice ??
+      0
+    );
+
+    const finalPrice = baseDishPrice + Number(extra);
 
     setCart((prev) => {
 
@@ -2635,7 +2642,7 @@ function App() {
 
                   <div className="combo-dish-info">
                     <h1 className="combo-dish-title">{selectedDish.Name || selectedDish.name}</h1>
-                    <div className="combo-dish-price">${Number(selectedDish.Price || selectedDish.price || 0).toFixed(2)}</div>
+                    <div className="combo-dish-price">${Number(selectedDish.Price ?? selectedDish.price ?? selectedDish.PricePerUnit ?? selectedDish.amount ?? selectedDish.DishPrice ?? 0).toFixed(2)}</div>
                     {selectedDish.Description && (
                       <p className="combo-dish-desc">{selectedDish.Description}</p>
                     )}
@@ -2729,7 +2736,14 @@ function App() {
                         (sum, m) => sum + Number(m.Price || 0),
                         0
                       );
-                      const basePrice = Number(selectedDish?.Price || selectedDish?.price || 0);
+                      const basePrice = Number(
+                        selectedDish?.Price ??
+                        selectedDish?.price ??
+                        selectedDish?.PricePerUnit ??
+                        selectedDish?.amount ??
+                        selectedDish?.DishPrice ??
+                        0
+                      );
                       return ((basePrice + extra) * comboQty).toFixed(2);
                     })()}
                   </button>
