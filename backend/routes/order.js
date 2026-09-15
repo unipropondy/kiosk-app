@@ -675,33 +675,10 @@ router.post("/send", async (req, res) => {
         status: (item.status === 'VOIDED' || item.StatusCode === 0) ? 'VOIDED' : (item.status || 'SENT')
       }));
 
-      const alreadySent = isKiosk && !cleanId
-        ? await pool.request()
-          .input("orderNo", sql.NVarChar(50), finalOrderId)
-          .query(`
-            SELECT COUNT(*) AS cnt
-            FROM RestaurantOrderDetailCur d
-            JOIN RestaurantOrderCur h ON d.OrderId = h.OrderId
-            WHERE h.OrderNumber = @orderNo AND d.StatusCode = 1
-          `)
-        : await pool.request()
-          .input("tableId", sql.UniqueIdentifier, cleanId)
-          .query(`
-            SELECT COUNT(*) AS cnt
-            FROM RestaurantOrderDetailCur d
-            JOIN RestaurantOrderCur h ON d.OrderId = h.OrderId
-            WHERE
-              (LTRIM(RTRIM(h.Tableno)) =
-                  (SELECT LTRIM(RTRIM(TableNumber))
-                  FROM TableMaster
-                  WHERE TableId = @tableId))
-              AND d.StatusCode = 1
-          `);
-
-      if (alreadySent.recordset[0].cnt === 0) {
+      if (sentItems.length === 0) {
         return res.json({
           success: false,
-          message: "Order already placed by another device."
+          message: "No items found to send."
         });
       }
 
@@ -1547,6 +1524,7 @@ router.post("/complete-online-payment", async (req, res) => {
     // ── STEP 3: GET OR CREATE ITEMS ──────────────────────────────────────────
     let itemsRes = await transaction.request()
       .input("orderId", sql.UniqueIdentifier, guidOrderId)
+      .input("orderNo", sql.NVarChar(50), orderId)
       .query(`
                 SELECT
                     d.DishId, d.DishName, d.Quantity, d.PricePerUnit,
@@ -1559,66 +1537,67 @@ router.post("/complete-online-payment", async (req, res) => {
                 LEFT JOIN DishMaster dish ON d.DishId = dish.DishId
                 LEFT JOIN DishGroupMaster dg ON dish.DishGroupId = dg.DishGroupId
                 LEFT JOIN CategoryMaster cm ON dg.CategoryId = cm.CategoryId
-                WHERE d.OrderId = @orderId
+                WHERE (d.OrderId = @orderId OR d.OrderNumber = @orderNo)
                   AND d.StatusCode NOT IN (0)
             `);
 
     let dbItems = itemsRes.recordset;
 
-    // If no items found, create from cart
-    // if (dbItems.length === 0 && cart && cart.length > 0) {
-    //   console.log(`⚠️ [PAYMENT] No items found, creating ${cart.length} items from cart`);
+    // If no items found in DB, create from cart array sent in payload
+    if (dbItems.length === 0 && cart && cart.length > 0) {
+      console.log(`⚠️ [PAYMENT] No items found in DB, creating ${cart.length} items from cart`);
 
-    //   for (const item of cart) {
-    //     const itemId = crypto.randomUUID();
-    //     const dishId = item.id || item.DishId || DEFAULT_GUID;
-    //     const dishName = item.name || item.Name || "Unknown";
-    //     const qty = item.qty || 1;
-    //     const price = item.price || item.Price || 0;
+      for (const item of cart) {
+        const itemId = crypto.randomUUID();
+        const dishId = item.id || item.DishId || DEFAULT_GUID;
+        const dishName = item.name || item.Name || "Unknown";
+        const qty = Number(item.qty || item.Quantity || 1);
+        const price = Number(item.price || item.Price || 0);
 
-    //     await transaction.request()
-    //       .input("detailId", sql.UniqueIdentifier, itemId)
-    //       .input("orderId", sql.UniqueIdentifier, guidOrderId)
-    //       .input("dishId", sql.UniqueIdentifier, dishId)
-    //       .input("dishName", sql.NVarChar(255), dishName)
-    //       .input("qty", sql.Int, qty)
-    //       .input("price", sql.Decimal(18, 2), price)
-    //       .input("bizId", sql.UniqueIdentifier, businessUnitId)
-    //       .input("orderNo", sql.NVarChar(50), orderId)
-    //       .input("userId", sql.UniqueIdentifier, DEFAULT_GUID)
-    //       .query(`
-    //                     INSERT INTO RestaurantOrderDetailCur (
-    //                         OrderDetailId, OrderId, DishId, DishName, Quantity, PricePerUnit,
-    //                         ActualAmount, TotalDetailLineAmount, StatusCode, CreatedOn,
-    //                         BusinessUnitId, OrderNumber, CreatedBy, Description
-    //                     ) VALUES (
-    //                         @detailId, @orderId, @dishId, @dishName, @qty, @price,
-    //                         @price * @qty, @price * @qty, 2, GETDATE(),
-    //                         @bizId, @orderNo, @userId, @dishName
-    //                     )
-    //                 `);
-    //   }
+        await transaction.request()
+          .input("detailId", sql.UniqueIdentifier, itemId)
+          .input("orderId", sql.UniqueIdentifier, guidOrderId)
+          .input("dishId", sql.UniqueIdentifier, dishId)
+          .input("dishName", sql.NVarChar(255), dishName)
+          .input("qty", sql.Int, qty)
+          .input("price", sql.Decimal(18, 2), price)
+          .input("bizId", sql.UniqueIdentifier, businessUnitId)
+          .input("orderNo", sql.NVarChar(50), orderId)
+          .input("userId", sql.UniqueIdentifier, DEFAULT_GUID)
+          .query(`
+                        INSERT INTO RestaurantOrderDetailCur (
+                            OrderDetailId, OrderId, DishId, DishName, Quantity, PricePerUnit,
+                            ActualAmount, TotalDetailLineAmount, StatusCode, CreatedOn,
+                            BusinessUnitId, OrderNumber, CreatedBy, Description
+                        ) VALUES (
+                            @detailId, @orderId, @dishId, @dishName, @qty, @price,
+                            @price * @qty, @price * @qty, 2, GETDATE(),
+                            @bizId, @orderNo, @userId, @dishName
+                        )
+                    `);
+      }
 
-    //   // Re-fetch items
-    //   itemsRes = await transaction.request()
-    //     .input("orderId", sql.UniqueIdentifier, guidOrderId)
-    //     .query(`
-    //                 SELECT
-    //                     d.DishId, d.DishName, d.Quantity, d.PricePerUnit,
-    //                     d.TotalDetailLineAmount, d.StatusCode,
-    //                     dish.DishGroupId,
-    //                     dg.CategoryId,
-    //                     cm.CategoryName,
-    //                     dg.DishGroupName
-    //                 FROM RestaurantOrderDetailCur d
-    //                 LEFT JOIN DishMaster dish ON d.DishId = dish.DishId
-    //                 LEFT JOIN DishGroupMaster dg ON dish.DishGroupId = dg.DishGroupId
-    //                 LEFT JOIN CategoryMaster cm ON dg.CategoryId = cm.CategoryId
-    //                 WHERE d.OrderId = @orderId
-    //                   AND d.StatusCode NOT IN (0)
-    //             `);
-    //   dbItems = itemsRes.recordset;
-    // }
+      // Re-fetch items
+      itemsRes = await transaction.request()
+        .input("orderId", sql.UniqueIdentifier, guidOrderId)
+        .input("orderNo", sql.NVarChar(50), orderId)
+        .query(`
+                    SELECT
+                        d.DishId, d.DishName, d.Quantity, d.PricePerUnit,
+                        d.TotalDetailLineAmount, d.StatusCode,
+                        dish.DishGroupId,
+                        dg.CategoryId,
+                        cm.CategoryName,
+                        dg.DishGroupName
+                    FROM RestaurantOrderDetailCur d
+                    LEFT JOIN DishMaster dish ON d.DishId = dish.DishId
+                    LEFT JOIN DishGroupMaster dg ON dish.DishGroupId = dg.DishGroupId
+                    LEFT JOIN CategoryMaster cm ON dg.CategoryId = cm.CategoryId
+                    WHERE (d.OrderId = @orderId OR d.OrderNumber = @orderNo)
+                      AND d.StatusCode NOT IN (0)
+                `);
+      dbItems = itemsRes.recordset;
+    }
 
     const subTotal = dbItems.reduce((sum, i) => sum + (i.TotalDetailLineAmount || 0), 0);
     console.log(`🔍 [PAYMENT] Found ${dbItems.length} items, SubTotal: ${subTotal}`);
@@ -1687,7 +1666,7 @@ router.post("/complete-online-payment", async (req, res) => {
     // ── STEP 4.5: UPSERT SETTLEMENT TOTALS ─────────────────────────────────
     const receiptCount = dbItems.reduce((sum, item) => sum + (Number(item.Quantity) || 0), 0);
     const settlementGatewayReference = gatewayReference || GatewayReference || null;
-    const cashIn = pMethod === "CASH" ? amount : 0;
+    const cashIn = amount;
 
     await transaction.request()
       .input("sid", sql.UniqueIdentifier, settlementId)
@@ -1716,7 +1695,6 @@ router.post("/complete-online-payment", async (req, res) => {
     console.log(`✅ [PAYMENT] SettlementTotalSales and SettlementTranDetail updated: ${settlementId}`);
 
     // ── STEP 5: UPSERT SETTLEMENT ITEM DETAILS ──────────────────────────────
-    // ✅ FIXED: Removed TotalAmount column and clear existing details if update
     if (isSettlementExists) {
       await transaction.request()
         .input("sid", sql.UniqueIdentifier, settlementId)

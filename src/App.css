@@ -1438,7 +1438,7 @@ body {
 }
 
 .kiosk-sidebar {
-  width: 280px;
+  width: 310px;
   background-color: #ffffff;
   display: flex;
   flex-direction: column;
@@ -1487,14 +1487,14 @@ body {
 
 .sidebar-cat-item {
   display: grid;
-  grid-template-columns: 4px 52px minmax(0, 1fr) 24px;
+  grid-template-columns: 4px 48px minmax(0, 1fr) 24px;
   column-gap: 10px;
   align-items: center;
-  min-height: clamp(56px, 8vh, 72px);
-  padding: 8px 10px;
+  min-height: 100px;
+  padding: 16px 12px;
   background: #fffdfa;
   border: 1px solid #fdf5ef;
-  border-radius: 12px;
+  border-radius: 16px;
   cursor: pointer;
   transition: all 0.2s ease;
   text-align: left;
@@ -1515,7 +1515,7 @@ body {
 
 .cat-indicator {
   width: 4px;
-  height: 32px;
+  height: 48px;
   background-color: #f97316;
   border-radius: 4px;
   flex-shrink: 0;
@@ -1526,8 +1526,8 @@ body {
 }
 
 .cat-image-container {
-  width: 52px;
-  height: 52px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   flex-shrink: 0;
   z-index: 2;
@@ -1554,13 +1554,14 @@ body {
 }
 
 .cat-item-name {
-  font-size: 1rem;
+  font-size: 1.05rem;
   font-weight: 700;
   color: #1f2937;
-  margin-bottom: 2px;
+  margin-bottom: 4px;
   white-space: normal;
-  word-break: break-word;
-  line-height: 1.15;
+  word-break: normal;
+  overflow-wrap: break-word;
+  line-height: 1.25;
 }
 
 .cat-decorative-lines {

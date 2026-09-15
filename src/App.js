@@ -961,70 +961,16 @@ function App() {
   // Online payment flow using YeahPay demo
 
   const handlePayOnline = async () => {
-    // Calculate total amount inside the function/
+    const cartItems = cart && cart.length ? cart : [];
+    const cartSub = cartItems.reduce((sum, item) => sum + (Number(item.Price || item.price || 0) * Number(item.qty || 1)), 0);
+    const calcTotal = Number(typeof totalAmount !== "undefined" ? totalAmount : 0);
+    const lockedTotal = Number(yeahPayPayableAmount || 0);
+    const validAmount = (cartSub > 0 ? cartSub : (calcTotal > 0 ? calcTotal : (lockedTotal > 0 ? lockedTotal : 0))).toFixed(2);
 
-    //OLD PROCESS---------------------------
-    // const totalAmount = cart.reduce((s, i) =>
-    //   s + (Number(i.Price || i.price || 0) * Number(i.qty || 1)), 0
-    // ).toFixed(2);
-
-    // console.log("Opening payment for amount:", totalAmount);
-    // console.log("POS Order ID:", currentOrderId);
-
-    //NEW PROCESS---------------------------
-
-    // const eligibleAmount = cart.reduce(
-    //   (sum, item) =>
-    //     Number(item.isServiceCharge || 0) === 1
-    //       ? sum +
-    //       Number(item.Price || item.price || 0) *
-    //       Number(item.qty || 1)
-    //       : sum,
-    //   0
-    // );
-
-    // Service Charge
-    // const serviceCharge =
-    //   eligibleAmount * (serviceChargePercent / 100);
-
-    // Cart Subtotal
-    // const subTotal = cart.reduce(
-    //   (sum, item) =>
-    //     sum +
-    //     Number(item.Price || item.price || 0) *
-    //     Number(item.qty || 1),
-    //   0
-    // );
-
-    // const promoAmount = Number(localStorage.getItem("promoAmount") || 0);
-
-    // GST Calculation
-    // const beforeGST = subTotal + serviceCharge;
-
-    // const gstAmount =
-    //   beforeGST * (gstPercent / 100);
-
-    // Final Total
-    // const grandTotal = subTotal + serviceCharge + gstAmount;
-
-    // const totalAmount = (
-    //   grandTotal - promoAmount
-    // ).toFixed(2);
-    const paymentAmount = totalAmount;
-
-    console.log("Payment Amount:", paymentAmount);
-
-    console.log("Subtotal:", subTotal);
-    // console.log("Eligible:", eligibleAmount);
-    console.log("Service Charge:", serviceCharge);
-    console.log("Grand Total:", totalAmount);
-
-    // 👇 Continue with your existing payment logic
-    console.log("Opening payment for amount:", totalAmount);
+    console.log("Opening online payment gateway for amount:", validAmount);
     console.log("POS Order ID:", currentOrderId);
-    // Pass the real POS orderId as posOrderId so we can use it on success
-    // (YeahPay generates its own orderId which does NOT match our DB OrderNumber)
-    const demoUrl = `https://yeahpay-demo-production-9437.up.railway.app?amount=${totalAmount}&orderId=${currentOrderId}&posOrderId=${encodeURIComponent(currentOrderId)}&from=pos`;
+
+    const demoUrl = `https://yeahpay-demo-production-9437.up.railway.app?amount=${validAmount}&orderId=${currentOrderId}&posOrderId=${encodeURIComponent(currentOrderId)}&from=pos`;
 
     const paymentWindow = window.open(demoUrl, '_blank', 'width=500,height=700');
 
@@ -1033,26 +979,19 @@ function App() {
       return;
     }
 
-    // Capture the POS orderId at time of opening (closure)
     const posOrderIdAtOpen = currentOrderId;
 
-    // Listen for payment success message
     const handleMessage = (event) => {
       if (event.data.type === 'YEAHPAY_PAYMENT_SUCCESS') {
         console.log("Payment success message received:", event.data);
 
-        // Remove event listener
         window.removeEventListener('message', handleMessage);
 
-        // Use the real POS orderId (posOrderId from event, or fallback to captured one)
-        // The YeahPay demo may send back posOrderId if it forwards it; otherwise use our captured value
         const realPosOrderId = event.data.posOrderId || posOrderIdAtOpen;
         console.log("Using POS OrderId for DB update:", realPosOrderId);
 
-        // Complete the order using the real POS orderId
-        completeOrder(realPosOrderId, totalAmount);
+        completeOrder(realPosOrderId, validAmount);
 
-        // Close the payment window
         if (paymentWindow) paymentWindow.close();
       }
     };
@@ -1103,7 +1042,7 @@ function App() {
         }, 1200);
       } else if (data.status === 103 || data.code === "0") {
         setYeahPayMsg(payWay === "PAYNOW" ? "Please scan PayNow QR code on YeahPay Terminal screen..." : "Please tap or insert card on YeahPay Terminal...");
-        
+
         let pollCount = 0;
         const maxPolls = 45;
         const pollInterval = setInterval(async () => {
@@ -1222,6 +1161,7 @@ function App() {
         return;
       }
 
+      setCart([]);
       setPaymentDone(true);
       handlePaymentSuccess(`Payment Successful! Amount: S$${amount}`);
 
@@ -1841,6 +1781,30 @@ function App() {
     </div>
   );
 
+  const CardIcon = () => (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <svg width="120" height="84" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="1" y="4" width="22" height="16" rx="3" ry="3" fill="#e0f2fe" stroke="#1d4ed8" strokeWidth="2" />
+        <line x1="1" y1="9" x2="23" y2="9" stroke="#1d4ed8" strokeWidth="2" />
+        <rect x="4" y="13" width="4" height="3" rx="1" fill="#f59e0b" />
+        <circle cx="16" cy="14.5" r="2" fill="#ef4444" opacity="0.9" />
+        <circle cx="18.5" cy="14.5" r="2" fill="#f59e0b" opacity="0.9" />
+      </svg>
+    </div>
+  );
+
+  const PayNowIcon = () => (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <svg width="130" height="90" viewBox="0 0 100 70" fill="none">
+        <rect width="100" height="70" rx="10" fill="#7b1fa2" />
+        <text x="50%" y="36%" textAnchor="middle" fill="#ffffff" fontSize="22" fontWeight="900" fontFamily="sans-serif">PAY</text>
+        <text x="50%" y="78%" textAnchor="middle" fill="#ffffff" fontSize="22" fontWeight="900" fontFamily="sans-serif">
+          N<tspan fill="#ed1c24">O</tspan>W
+        </text>
+      </svg>
+    </div>
+  );
+
   const JcbBrand = () => (
     <div style={{ display: 'flex', gap: '1px', fontWeight: 'bold', fontSize: '10px' }}>
       {/* <div style={{ background: '#005BBB', color: '#fff', padding: '1px 2px', borderRadius: '1px' }}>J</div> */}
@@ -2174,15 +2138,15 @@ function App() {
                           <HeroCarIcon />
                         </div>
                       </div>
-                     <div className="hero-text">
-  <h2>
-    {categories.find(c => c.CategoryId === activeCategory)?.KitchenTypeName || "Special Offers"}
-  </h2>
+                      <div className="hero-text">
+                        <h2>
+                          {categories.find(c => c.CategoryId === activeCategory)?.KitchenTypeName || "Special Offers"}
+                        </h2>
 
-  <p>
-    {heroDescription}
-  </p>
-</div>
+                        <p>
+                          {heroDescription}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -2236,7 +2200,7 @@ function App() {
                         <div className="new-kiosk-dish-info">
                           <div className="new-kiosk-dish-name">{dish.Name}</div>
                           <div className="new-kiosk-dish-desc">
-                            { dish.Description ||"Premium Car Care. Exceptional Service."}
+                            {dish.Description || "Premium Car Care. Exceptional Service."}
                           </div>
                           <div className="new-kiosk-dish-price">
                             ${Number(dish.Price || 0).toFixed(2)}
@@ -2818,25 +2782,24 @@ function App() {
                     <div className="payment-mode-card paynow-card" style={{ borderColor: '#3b82f6', background: '#eff6ff' }} onClick={() => {
                       handleYeahPayPayment("CARD");
                     }}>
-                      <div className="payment-mode-icons grid-icons">
-                        <MastercardBrand />
-                        <VisaBrand />
-                        <AmexBrand />
+                      <div className="payment-mode-icons" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '110px' }}>
+                        <CardIcon />
                       </div>
-                      <div className="payment-mode-label" style={{ color: '#1d4ed8' }}>YeahPay Terminal (Card)</div>
+                      <div className="payment-mode-label" style={{ color: '#1d4ed8', fontSize: '22px', fontWeight: 'bold', marginTop: '8px' }}>Card</div>
                     </div>
 
                     {/* Card 2: YeahPay Cloud POS - PayNow */}
                     <div className="payment-mode-card paynow-card" style={{ borderColor: '#ec4899', background: '#fdf2f8' }} onClick={() => {
                       handleYeahPayPayment("PAYNOW");
                     }}>
-                      <div className="payment-mode-icons grid-icons">
-                        <PayNowBrand />
+                      <div className="payment-mode-icons" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '110px' }}>
+                        <PayNowIcon />
                       </div>
-                      <div className="payment-mode-label" style={{ color: '#be185d' }}>YeahPay Terminal (PayNow)</div>
+                      <div className="payment-mode-label" style={{ color: '#be185d', fontSize: '22px', fontWeight: 'bold', marginTop: '8px' }}>PayNow</div>
                     </div>
 
-                    {/* Card 3: PayNow Gateway (Online) */}
+                    {/* Hidden: PayNow Gateway (Online) button */}
+                    {/* 
                     <div className="payment-mode-card paynow-card" onClick={() => {
                       setShowPaymentPopup(false);
                       handlePayOnline();
@@ -2849,8 +2812,10 @@ function App() {
                       </div>
                       <div className="payment-mode-label">PayNow (Gateway)</div>
                     </div>
+                    */}
 
-                    {/* Card 3 */}
+                    {/* Hidden: Cash/EZ Link button */}
+                    {/* 
                     <div className="payment-mode-card" onClick={async () => {
                       try {
                         await fetch(`${API}/order/mark-sent`, {
@@ -2893,6 +2858,7 @@ function App() {
                       </div>
                       <div className="payment-mode-label">Cash/EZ Link</div>
                     </div>
+                    */}
                   </div>
                 </div>
               </div>
@@ -2976,7 +2942,7 @@ function App() {
                       onClick={async () => {
                         try {
                           await fetch(`${API}/yeahpay/cancel`, { method: "POST" });
-                        } catch (e) {}
+                        } catch (e) { }
                         setShowYeahPayModal(false);
                       }}
                       style={{
