@@ -1,5 +1,4 @@
 const crypto = require("crypto");
-const { v4: uuidv4 } = require("uuid");
 
 /**
  * YeahPay Cloud MISPOS API Service Utility
@@ -130,7 +129,7 @@ class YeahPayService {
         deviceSn: targetDeviceSn,
         messageType: "Request",
         protocolVersion: "1.0",
-        serviceId: uuidv4()
+        serviceId: crypto.randomUUID()
       },
       securityTrailer: {
         cryptoVersion: "1.0",
