@@ -2016,6 +2016,64 @@ router.post("/complete-online-payment", async (req, res) => {
   }
 });
 
+router.post("/clear-cart", async (req, res) => {
+  try {
+    const { orderId } = req.body;
+
+    if (!orderId) {
+      return res.status(400).json({
+        success: false,
+        error: "orderId missing"
+      });
+    }
+
+    const pool = await poolPromise;
+
+    // Delete modifiers first
+    await pool.request()
+      .input("orderId", sql.NVarChar(100), orderId)
+      .query(`
+        DELETE FROM RestaurantmodifierdetailCur
+        WHERE OrderDetailId IN (
+          SELECT OrderDetailId
+          FROM RestaurantOrderDetailCur
+          WHERE OrderId = TRY_CONVERT(uniqueidentifier, @orderId)
+        )
+      `);
+
+    // Delete cart items
+    await pool.request()
+      .input("orderId", sql.NVarChar(100), orderId)
+      .query(`
+        DELETE FROM RestaurantOrderDetailCur
+        WHERE OrderId = TRY_CONVERT(uniqueidentifier, @orderId)
+      `);
+
+    // Clear order total
+    await pool.request()
+      .input("orderId", sql.NVarChar(100), orderId)
+      .query(`
+        UPDATE RestaurantOrderCur
+        SET TotalAmount = 0
+        WHERE OrderId = TRY_CONVERT(uniqueidentifier, @orderId)
+      `);
+
+    res.json({
+      success: true,
+      message: "Cart cleared successfully"
+    });
+
+  } catch (err) {
+    console.error("CLEAR CART ERROR:", err);
+    res.status(500).json({
+      success: false,
+      error: err.message
+    });
+  }
+});
+
+
+
 module.exports = router;
 
 
