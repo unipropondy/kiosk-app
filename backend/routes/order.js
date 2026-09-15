@@ -505,11 +505,12 @@ router.get("/kiosk/tables", async (req, res) => {
   try {
     const pool = await poolPromise;
     const result = await pool.request().query(`
-      SELECT TableId, TableNumber AS TableNo
+      SELECT TOP 1 TableId, TableNumber AS TableNo
       FROM TableMaster
-      WHERE DiningSection IN (1, 2, 3)
+      WHERE CurrentOrderId IS NULL
+        AND DiningSection IN (1, 2, 3)
         AND ISNULL(Status, 0) = 0
-      ORDER BY TableNumber ASC
+      ORDER BY SortCode ASC
     `);
     res.json({ success: true, tables: result.recordset });
   } catch (err) {
@@ -1053,12 +1054,114 @@ router.post("/hold", async (req, res) => {
 
 router.post("/checkout", async (req, res) => {
   try {
-    const { tableId } = req.body;
+    const { tableId, orderId, cart, userId } = req.body;
     const cleanId = tableId.replace(/^\{|\}$/g, "").trim();
     const pool = await poolPromise;
+    const transaction = new sql.Transaction(pool);
+
+    await transaction.begin();
+
+    let orderNumber = orderId || null;
+    let orderGuid = null;
+    let tableNumber = null;
+
+    const tableInfo = await transaction.request()
+      .input("tid", sql.UniqueIdentifier, cleanId)
+      .query("SELECT TableNumber, CurrentOrderId FROM TableMaster WHERE TableId = @tid");
+
+    if (tableInfo.recordset.length > 0) {
+      tableNumber = tableInfo.recordset[0].TableNumber;
+      orderNumber = orderNumber || tableInfo.recordset[0].CurrentOrderId || null;
+    }
+
+    if (orderNumber) {
+      const headerCheck = await transaction.request()
+        .input("orderNo", sql.NVarChar(50), orderNumber)
+        .query("SELECT TOP 1 OrderId FROM RestaurantOrderCur WHERE OrderNumber = @orderNo");
+
+      if (headerCheck.recordset.length > 0) {
+        orderGuid = headerCheck.recordset[0].OrderId;
+      } else {
+        orderGuid = crypto.randomUUID();
+        await transaction.request()
+          .input("orderId", sql.UniqueIdentifier, orderGuid)
+          .input("orderNo", sql.NVarChar(50), orderNumber)
+          .input("tableNo", sql.VarChar(20), tableNumber || "TAKEAWAY")
+          .input("userId", sql.UniqueIdentifier, toGuidOrNull(userId) || DEFAULT_GUID)
+          .input("bizId", sql.UniqueIdentifier, DEFAULT_GUID)
+          .query(`
+            INSERT INTO RestaurantOrderCur (
+              OrderId, OrderNumber, OrderDateTime, Tableno, StatusCode,
+              CreatedBy, CreatedOn, isOrderClosed, BusinessUnitId,
+              entry_Status, start_date
+            ) VALUES (
+              @orderId, @orderNo, GETDATE(), LTRIM(RTRIM(@tableNo)), 1,
+              @userId, GETDATE(), 0, @bizId, 'q',
+              (SELECT TOP 1 StartDate FROM DateEntry ORDER BY CreatedDate DESC)
+            )
+          `);
+
+        await transaction.request()
+          .input("tid", sql.UniqueIdentifier, cleanId)
+          .input("orderNo", sql.NVarChar(50), orderNumber)
+          .query(`
+            UPDATE TableMaster
+            SET CurrentOrderId = @orderNo,
+                ModifiedOn = GETDATE()
+            WHERE TableId = @tid
+          `);
+      }
+    }
+
+    if (orderGuid && Array.isArray(cart) && cart.length > 0) {
+      const detailCheck = await transaction.request()
+        .input("orderId", sql.UniqueIdentifier, orderGuid)
+        .query("SELECT TOP 1 OrderDetailId FROM RestaurantOrderDetailCur WHERE OrderId = @orderId");
+
+      if (detailCheck.recordset.length === 0) {
+        for (const item of cart) {
+          const itemId = crypto.randomUUID();
+          const quantity = Number(item.qty || item.Quantity || 1);
+          const price = Number(item.price || item.PricePerUnit || item.Price || 0);
+          const dishName = String(item.name || item.DishName || item.ProductName || "Dish").substring(0, 200);
+          const dishId = item.id || item.DishId || DEFAULT_GUID;
+
+          await transaction.request()
+            .input("detailId", sql.UniqueIdentifier, itemId)
+            .input("orderId", sql.UniqueIdentifier, orderGuid)
+            .input("dishId", sql.UniqueIdentifier, dishId)
+            .input("dishName", sql.NVarChar(200), dishName)
+            .input("qty", sql.Int, quantity)
+            .input("price", sql.Decimal(18, 2), price)
+            .input("amount", sql.Decimal(18, 2), price * quantity)
+            .input("bizId", sql.UniqueIdentifier, DEFAULT_GUID)
+            .input("orderNo", sql.NVarChar(50), orderNumber)
+            .input("userId", sql.UniqueIdentifier, toGuidOrNull(userId) || DEFAULT_GUID)
+            .input("note", sql.NVarChar(100), String(item.note || item.remarks || "").substring(0, 100))
+            .input("mods", sql.NVarChar(sql.MAX), JSON.stringify(item.modifiers || []).substring(0, 4000))
+            .input("combo", sql.NVarChar(sql.MAX), JSON.stringify(item.comboSelections || []).substring(0, 4000))
+            .query(`
+              INSERT INTO RestaurantOrderDetailCur (
+                OrderDetailId, OrderId, DishId, Description, DishName,
+                Quantity, PricePerUnit, ActualAmount, TotalDetailLineAmount,
+                StatusCode, CreatedBy, CreatedOn, ModifiersJSON,
+                OrderNumber, Remarks, isTakeAway, BusinessUnitId,
+                OrderDateTime, ComboDetailsJSON, start_date
+              ) VALUES (
+                @detailId, @orderId, @dishId, @dishName, @dishName,
+                @qty, @price, @amount, @amount, 1,
+                @userId, GETDATE(), @mods,
+                @orderNo, @note, 0, @bizId,
+                GETDATE(), @combo,
+                (SELECT TOP 1 StartDate FROM DateEntry ORDER BY CreatedDate DESC)
+              )
+            `);
+        }
+      }
+    }
 
     // Step 1: Move table to Payment Pending (Status 2) and mark items as SERVED (4)
-    await pool.request()
+    await transaction.request()
       .input("tid", sql.UniqueIdentifier, cleanId)
       .query(`
         -- 1. Update Table Status to Checkout (2)
@@ -1074,6 +1177,8 @@ router.post("/checkout", async (req, res) => {
         AND (h.isOrderClosed = 0 OR h.isOrderClosed IS NULL)
         AND d.StatusCode IN (1, 2, 3, 5);
       `);
+
+    await transaction.commit();
 
     const updated = await syncTableStatus(req, cleanId);
 
@@ -1094,6 +1199,7 @@ router.post("/checkout", async (req, res) => {
 
     res.json({ success: true, ...updated });
   } catch (err) {
+    try { if (transaction && transaction._isStarted) await transaction.rollback(); } catch (_) {}
     console.error("❌ Checkout Error:", err.message);
     res.status(500).json({ error: err.message });
   }
