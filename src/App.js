@@ -2649,64 +2649,67 @@ function App() {
                   </div>
 
                   <div className="combo-selections-area">
-                    <div className="combo-group-section">
-                      <div className="group-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#1f2937' }}>Modifiers</h3>
-                      </div>
+                    {modifiers.filter((m) => m.ModifierName?.toUpperCase() !== "OPEN").length > 0 || customMods.length > 0 ? (
+                      <div className="combo-group-section">
+                        <div className="group-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#1f2937' }}>Modifiers</h3>
+                        </div>
 
-                      <div className="options-grid-2col">
-                        {modifiers.map((m) => {
-                          const isSelected = selectedModifierIds.includes(m.ModifierID);
-                          const isCustomOpen = m.ModifierName.toUpperCase() === "OPEN";
-                          return (
-                            <div
-                              key={m.ModifierID}
-                              className={`option-card-row ${isSelected ? 'selected' : ''}`}
-                              onClick={() => toggleModifier(m)}
-                              style={{
-                                borderColor: isSelected ? themeColor : '#e5e7eb',
-                              }}
-                            >
-                              <div className="option-checkbox-square" style={{ borderColor: isSelected ? themeColor : '#d1d5db', backgroundColor: isSelected ? themeColor : 'transparent' }}>
-                                {isSelected && <span style={{ color: 'white', fontSize: '12px' }}>✓</span>}
-                              </div>
-                              <div className="option-row-info">
-                                <div className="option-name" style={{ color: '#111827' }}>{m.ModifierName}</div>
-                                {!isCustomOpen && (
+                        <div className="options-grid-2col">
+                          {modifiers.filter((m) => m.ModifierName?.toUpperCase() !== "OPEN").map((m) => {
+                            const isSelected = selectedModifierIds.includes(m.ModifierID);
+                            return (
+                              <div
+                                key={m.ModifierID}
+                                className={`option-card-row ${isSelected ? 'selected' : ''}`}
+                                onClick={() => toggleModifier(m)}
+                                style={{
+                                  borderColor: isSelected ? themeColor : '#e5e7eb',
+                                }}
+                              >
+                                <div className="option-checkbox-square" style={{ borderColor: isSelected ? themeColor : '#d1d5db', backgroundColor: isSelected ? themeColor : 'transparent' }}>
+                                  {isSelected && <span style={{ color: 'white', fontSize: '12px' }}>✓</span>}
+                                </div>
+                                <div className="option-row-info">
+                                  <div className="option-name" style={{ color: '#111827' }}>{m.ModifierName}</div>
                                   <div className="option-price" style={{ color: '#6b7280' }}>
                                     {m.Price > 0 ? `+$${Number(m.Price).toFixed(2)}` : '$0.00'}
                                   </div>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-
-                        {customMods.map((m) => {
-                          const isSelected = selectedModifierIds.includes(m.ModifierID);
-                          return (
-                            <div
-                              key={m.ModifierID}
-                              className={`option-card-row ${isSelected ? 'selected' : ''}`}
-                              onClick={() => toggleModifier(m)}
-                              style={{
-                                borderColor: isSelected ? themeColor : '#e5e7eb',
-                              }}
-                            >
-                              <div className="option-checkbox-square" style={{ borderColor: isSelected ? themeColor : '#d1d5db', backgroundColor: isSelected ? themeColor : 'transparent' }}>
-                                {isSelected && <span style={{ color: 'white', fontSize: '12px' }}>✓</span>}
-                              </div>
-                              <div className="option-row-info">
-                                <div className="option-name" style={{ color: '#111827' }}>{m.ModifierName} (Custom)</div>
-                                <div className="option-price" style={{ color: '#6b7280' }}>
-                                  {m.Price > 0 ? `+$${Number(m.Price).toFixed(2)}` : '$0.00'}
                                 </div>
                               </div>
-                            </div>
-                          );
-                        })}
+                            );
+                          })}
+
+                          {customMods.map((m) => {
+                            const isSelected = selectedModifierIds.includes(m.ModifierID);
+                            return (
+                              <div
+                                key={m.ModifierID}
+                                className={`option-card-row ${isSelected ? 'selected' : ''}`}
+                                onClick={() => toggleModifier(m)}
+                                style={{
+                                  borderColor: isSelected ? themeColor : '#e5e7eb',
+                                }}
+                              >
+                                <div className="option-checkbox-square" style={{ borderColor: isSelected ? themeColor : '#d1d5db', backgroundColor: isSelected ? themeColor : 'transparent' }}>
+                                  {isSelected && <span style={{ color: 'white', fontSize: '12px' }}>✓</span>}
+                                </div>
+                                <div className="option-row-info">
+                                  <div className="option-name" style={{ color: '#111827' }}>{m.ModifierName} (Custom)</div>
+                                  <div className="option-price" style={{ color: '#6b7280' }}>
+                                    {m.Price > 0 ? `+$${Number(m.Price).toFixed(2)}` : '$0.00'}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div style={{ textAlign: 'center', padding: '30px 20px', color: '#6b7280' }}>
+                        No additional options or modifiers required for this item.
+                      </div>
+                    )}
                   </div>
                 </div>
 
