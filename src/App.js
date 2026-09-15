@@ -1395,7 +1395,20 @@ function App() {
         try { await pendingSaveRef.current; } catch (_) { }
       }
 
+      const calculatedOrderTotal =
+        cart.reduce((s, i) => s + (Number(i.Price || i.price || 0) * Number(i.qty || 1)), 0).toFixed(2);
+      if (Number(calculatedOrderTotal) > 0) {
+        setYeahPayPayableAmount(calculatedOrderTotal);
+      }
+
       const newItems = cart.filter(item => item.status === "NEW");
+
+      // If items have already been sent to backend, simply re-open payment modal
+      if (newItems.length === 0 && cart.length > 0) {
+        console.log("All cart items already sent. Re-opening payment modal.");
+        setShowPaymentPopup(true);
+        return;
+      }
 
       const payload = {
         isKiosk: isKiosk,
@@ -2438,7 +2451,7 @@ function App() {
                         <button
                           className="checkout-btn"
                           onClick={placeOrder}
-                          disabled={!cart.some(item => item.status === "NEW")}
+                          disabled={cart.length === 0 || isCartLoading}
                           style={{ margin: 0 }}
                         >
                           Checkout
