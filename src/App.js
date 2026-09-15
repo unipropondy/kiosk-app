@@ -1491,10 +1491,19 @@ function App() {
       if (data.items) {
         const fromDB = data.items.map((item) => ({
           ...item,
+          id: item.DishId || item.id,
+          DishId: item.DishId || item.id,
+          name: item.Name || item.DishName || item.name || "Item",
+          Name: item.Name || item.DishName || item.name || "Item",
+          qty: Number(item.qty || item.Quantity || 1),
+          Quantity: Number(item.qty || item.Quantity || 1),
+          price: Number(item.price || item.Price || item.PricePerUnit || 0),
+          Price: Number(item.price || item.Price || item.PricePerUnit || 0),
+          status: item.status || (item.StatusCode === 1 ? "NEW" : "SENT"),
           isServiceCharge: Number(item.isServiceCharge || 0),
           lineItemId: item.OrderDetailId || item.lineItemId,
-          cartId: item.OrderDetailId || crypto.randomUUID(),
-          selectedMods: item.modifiers || [],
+          cartId: item.OrderDetailId || item.lineItemId || crypto.randomUUID(),
+          selectedMods: item.modifiers || (item.ModifiersJSON ? (() => { try { return JSON.parse(item.ModifiersJSON); } catch { return []; } })() : []),
           comboSelections:
             item.comboSelections ||
             (item.ComboDetailsJSON

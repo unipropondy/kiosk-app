@@ -831,11 +831,36 @@ router.get("/cart/kiosk/:orderId", async (req, res) => {
     const itemsResult = await pool.request()
       .input("oid", sql.NVarChar(100), cleanOrderId)
       .query(`
-        SELECT d.*, dish.Name, dish.Price, dish.isServiceCharge
+        SELECT 
+          d.OrderDetailId as lineItemId,
+          d.OrderDetailId,
+          d.DishId as id,
+          d.DishId,
+          d.Quantity as qty,
+          d.Quantity,
+          d.PricePerUnit as price,
+          d.PricePerUnit,
+          ISNULL(dish.Name, d.DishName) as name,
+          ISNULL(dish.Name, d.DishName) as Name,
+          dish.isServiceCharge AS isServiceCharge,
+          d.ModifiersJSON,
+          d.ComboDetailsJSON,
+          d.Remarks as note,
+          d.isTakeAway as isTakeaway,
+          CASE d.StatusCode
+            WHEN 1 THEN 'NEW'
+            WHEN 2 THEN 'SENT'
+            WHEN 3 THEN 'READY'
+            WHEN 4 THEN 'SERVED'
+            WHEN 5 THEN 'HOLD'
+            WHEN 0 THEN 'VOIDED'
+            ELSE 'SENT'
+          END as status
         FROM RestaurantOrderDetailCur d
         JOIN RestaurantOrderCur h ON d.OrderId = h.OrderId
         LEFT JOIN DishMaster dish ON d.DishId = dish.DishId
         WHERE h.OrderNumber = @oid AND (h.isOrderClosed = 0 OR h.isOrderClosed IS NULL)
+        AND d.StatusCode <> 0
       `);
     return res.json({ items: itemsResult.recordset || [], currentOrderId: cleanOrderId });
   } catch (err) {
