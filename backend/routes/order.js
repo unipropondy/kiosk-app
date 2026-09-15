@@ -173,7 +173,7 @@ async function syncToProfessionalTables(transaction, tableId, displayOrderId, it
     )
       .input("bizId", sql.UniqueIdentifier, bizId)
       .input("entry_Status", sql.NVarChar(20), "q")
-      .query("INSERT INTO RestaurantOrderCur (OrderId, OrderNumber, OrderDateTime, Tableno, StatusCode, CreatedBy, CreatedOn, isOrderClosed, BusinessUnitId,entry_Status) VALUES (@orderId, @orderNo, GETDATE(), LTRIM(RTRIM(@tableNo)), 1, @userId, GETDATE(), 0, @bizId, 'q')");
+      .query("INSERT INTO RestaurantOrderCur (OrderId, OrderNumber, OrderDateTime, Tableno, StatusCode, CreatedBy, CreatedOn, isOrderClosed, BusinessUnitId,entry_Status, start_date) VALUES (@orderId, @orderNo, GETDATE(), LTRIM(RTRIM(@tableNo)), 1, @userId, GETDATE(), 0, @bizId, 'q', (SELECT TOP 1 StartDate FROM DateEntry ORDER BY CreatedDate DESC))");
   }
   for (const item of items) {
     const cleanProdId = String(item.id || item.ProductId || DEFAULT_GUID).replace(/^\{|\}$/g, "").trim();
@@ -931,12 +931,13 @@ router.post("/cancel", async (req, res) => {
             SettlementID, LastSettlementDate, BillNo, OrderType, TableNo, Section, 
             CashierID, BusinessUnitId, SysAmount, ManualAmount, CreatedBy, CreatedOn, 
             IsCancelled, CancellationReason, CancelledDate, CancelledByUserName, 
-            SubTotal, TotalTax, DiscountAmount, MobileNo, VoidItemQty, VoidItemAmount
+            SubTotal, TotalTax, DiscountAmount, MobileNo, VoidItemQty, VoidItemAmount, start_date
           ) VALUES (
             @sid, GETDATE(), @oid, 'DINE-IN', @tableNo, @section, 
             @userId, @bizId, 0, 0, @userId, GETDATE(), 
             1, @reason, GETDATE(), @userName, 
-            @subTotal, 0, 0, @mobile, @voidQty, @voidAmt
+            @subTotal, 0, 0, @mobile, @voidQty, @voidAmt,
+            (SELECT TOP 1 StartDate FROM DateEntry ORDER BY CreatedDate DESC)
           )
         `);
 
@@ -954,10 +955,11 @@ router.post("/cancel", async (req, res) => {
           .query(`
             INSERT INTO SettlementItemDetail (
               SettlementID, DishId, DishName, Qty, Price, Status, OrderDateTime,
-              CategoryId, CategoryName, SubCategoryName
+              CategoryId, CategoryName, SubCategoryName, start_date
             ) VALUES (
               @sid, @dishId, @dishName, @qty, @price, 'VOIDED', GETDATE(),
-              @catId, @catName, @groupName
+              @catId, @catName, @groupName,
+              (SELECT TOP 1 StartDate FROM DateEntry ORDER BY CreatedDate DESC)
             )
           `);
       }
@@ -1524,10 +1526,11 @@ router.post("/complete-online-payment", async (req, res) => {
         .query(`
                     INSERT INTO RestaurantOrderCur (
                         OrderId, OrderNumber, OrderDateTime, Tableno, StatusCode, 
-                        CreatedBy, CreatedOn, BusinessUnitId, isOrderClosed, entry_Status
+                        CreatedBy, CreatedOn, BusinessUnitId, isOrderClosed, entry_Status, start_date
                     ) VALUES (
                         @orderId, @orderNo, GETDATE(), @tableNo, 1, 
-                        @userId, GETDATE(), @bizId, 0, 'q'
+                        @userId, GETDATE(), @bizId, 0, 'q',
+                        (SELECT TOP 1 StartDate FROM DateEntry ORDER BY CreatedDate DESC)
                     )
                 `);
     } else {
@@ -1678,12 +1681,13 @@ router.post("/complete-online-payment", async (req, res) => {
                       SettlementID, LastSettlementDate, BillNo, OrderType, TableNo, Section,
                       BusinessUnitId, SysAmount, ManualAmount, CreatedOn,
                       SubTotal, TotalTax, DiscountAmount, MobileNo, IsCancelled,
-                      CreatedBy
+                      CreatedBy, start_date
                   ) VALUES (
                       @sid, GETDATE(), @oid, 'DINE-IN', @tableNo, @section,
                       @bizId, @sysAmount, @sysAmount, GETDATE(),
                       @subTotal, 0, 0, @mobile, 0,
-                      @userId
+                      @userId,
+                      (SELECT TOP 1 StartDate FROM DateEntry ORDER BY CreatedDate DESC)
                   )
               `);
       console.log(`✅ [PAYMENT] SettlementHeader inserted: ${settlementId}`);
@@ -1740,10 +1744,11 @@ router.post("/complete-online-payment", async (req, res) => {
         .query(`
                     INSERT INTO SettlementItemDetail (
                         SettlementID, DishId, DishName, Qty, Price, Status, OrderDateTime,
-                        CategoryId, CategoryName, SubCategoryName
+                        CategoryId, CategoryName, SubCategoryName, start_date
                     ) VALUES (
                         @sid, @dishId, @dishName, @qty, @price, 'NORMAL', GETDATE(),
-                        @catId, @catName, @groupName
+                        @catId, @catName, @groupName,
+                        (SELECT TOP 1 StartDate FROM DateEntry ORDER BY CreatedDate DESC)
                     )
                 `);
     }
