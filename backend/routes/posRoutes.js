@@ -35,7 +35,7 @@ router.get("/kitchens", async (req, res) => {
       LEFT JOIN CategoryKitchenType ckt ON cm.CategoryId = ckt.CategoryId
       WHERE cm.IsActive = 1
       AND ISNULL(cm.IsPublished,0) = 0
-      ORDER BY cm.SortCode ASC, cm.CategoryName ASC
+      ORDER BY cm.SortCode ASC
     `);
     setCache("kitchens", result.recordset);
     res.json(result.recordset);

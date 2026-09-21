@@ -227,8 +227,8 @@ async function syncToProfessionalTables(transaction, tableId, displayOrderId, it
     //   }
     // }
 
-    
-   if (!lineItemId || lineItemId.length < 10) {
+
+    if (!lineItemId || lineItemId.length < 10) {
 
       const matchCheck = await transaction.request()
         .input("orderId", sql.UniqueIdentifier, orderGuid)
@@ -252,13 +252,13 @@ async function syncToProfessionalTables(transaction, tableId, displayOrderId, it
       } else {
         lineItemId = crypto.randomUUID();
       }
-      }
+    }
     // const comboDetailsJSON = JSON.stringify(item.comboSelections || []).substring(0, 4000);
 
     console.log("MATCH LINEITEM:", lineItemId);
-console.log("ITEM:", item.name);
-console.log("COMBO:", comboDetailsJSON);
-console.log("QTY:", item.qty);
+    console.log("ITEM:", item.name);
+    console.log("COMBO:", comboDetailsJSON);
+    console.log("QTY:", item.qty);
 
     const detailCheck = await transaction.request().input("detailId", sql.UniqueIdentifier, lineItemId).query("SELECT OrderDetailId,StatusCode FROM RestaurantOrderDetailCur WHERE OrderDetailId = @detailId");
     if (detailCheck.recordset.length > 0) {
@@ -1199,7 +1199,7 @@ router.post("/checkout", async (req, res) => {
 
     res.json({ success: true, ...updated });
   } catch (err) {
-    try { if (transaction && transaction._isStarted) await transaction.rollback(); } catch (_) {}
+    try { if (transaction && transaction._isStarted) await transaction.rollback(); } catch (_) { }
     console.error("❌ Checkout Error:", err.message);
     res.status(500).json({ error: err.message });
   }
@@ -2072,6 +2072,82 @@ router.post("/clear-cart", async (req, res) => {
   }
 });
 
+router.get("/kiosk/customer/:carNumber", async (req, res) => {
+  try {
+    const { carNumber } = req.params;
+
+    const pool = await poolPromise;
+
+    const result = await pool.request()
+      .input("CarNumber", sql.NVarChar(50), carNumber.trim())
+      .query(`
+        SELECT TOP 1
+          CustomerVehicleId,
+          CustomerName,
+          CarNumber,
+          MobileNumber,
+          VehicleType,
+          DefaultDishId
+        FROM kioskCustomer
+        WHERE CarNumber = @CarNumber
+          AND IsActive = 1
+      `);
+
+    if (result.recordset.length === 0) {
+      return res.json({
+        success: true,
+        exists: false,
+        customer: null
+      });
+    }
+
+    return res.json({
+      success: true,
+      exists: true,
+      customer: result.recordset[0]
+    });
+
+  } catch (error) {
+    console.error("Kiosk customer search error:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: "Unable to search customer."
+    });
+  }
+});
+
+router.get("/kiosk/customers", async (req, res) => {
+  try {
+    const pool = await poolPromise;
+
+    const result = await pool.request().query(`
+      SELECT
+        CustomerVehicleId,
+        CustomerName,
+        CarNumber,
+        MobileNumber,
+        VehicleType,
+        DefaultDishId
+      FROM kioskCustomer
+      WHERE IsActive = 1
+      ORDER BY CreatedOn DESC
+    `);
+
+    return res.json({
+      success: true,
+      customers: result.recordset
+    });
+
+  } catch (error) {
+    console.error("Kiosk customers search error:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: "Unable to load customers."
+    });
+  }
+});
 
 
 module.exports = router;

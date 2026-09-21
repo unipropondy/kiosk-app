@@ -17,7 +17,8 @@
   position: relative;
 }
 
-@media (max-width: 700px), (max-height: 700px) {
+@media (max-width: 700px),
+(max-height: 700px) {
   .start-page-header {
     padding: 14px max(16px, env(safe-area-inset-right)) 14px max(16px, env(safe-area-inset-left));
   }
@@ -26,7 +27,7 @@
     gap: 8px;
   }
 
-  .sp-logo-area > svg {
+  .sp-logo-area>svg {
     width: 38px;
     height: 38px;
   }
@@ -92,12 +93,12 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(to right, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.75) 30%, rgba(255,255,255,0.92) 100%);
+  background: linear-gradient(to right, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.75) 30%, rgba(255, 255, 255, 0.92) 100%);
   z-index: 0;
 }
 
 /* All children sit above the overlay */
-.start-page-container > * {
+.start-page-container>* {
   position: relative;
   z-index: 1;
 }
@@ -143,7 +144,7 @@
   font-weight: 600;
   color: #374151;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
 /* ── Main Content ── */
@@ -252,7 +253,7 @@
   align-items: center;
   gap: 12px;
   cursor: pointer;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
   transition: transform 0.18s ease, box-shadow 0.18s ease;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -322,7 +323,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 12px rgba(249,115,22,0.35);
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.35);
   margin-top: 4px;
   transition: background 0.15s;
 }
@@ -352,15 +353,22 @@
 }
 
 @keyframes pulse-footer {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.75; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.75;
+  }
 }
 
 /* ── Loading Overlay ── */
 .sp-loading-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(255,255,255,0.8);
+  background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(10px);
   display: flex;
   flex-direction: column;
@@ -372,7 +380,7 @@
 .sp-spinner {
   width: 60px;
   height: 60px;
-  border: 6px solid rgba(249,115,22,0.2);
+  border: 6px solid rgba(249, 115, 22, 0.2);
   border-top-color: #f97316;
   border-radius: 50%;
   animation: spin 0.9s linear infinite;
@@ -380,7 +388,9 @@
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .sp-loading-text {
@@ -401,7 +411,7 @@
   border-radius: 12px;
   font-weight: 600;
   font-size: 1.1rem;
-  box-shadow: 0 4px 16px rgba(239,68,68,0.3);
+  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.3);
   z-index: 10;
   white-space: nowrap;
 }
@@ -422,7 +432,7 @@
   padding: 22px 38px;
 }
 
-.sp-logo-area > svg {
+.sp-logo-area>svg {
   width: 62px;
   height: 62px;
   padding: 11px;
@@ -666,12 +676,13 @@
   }
 }
 
-@media (max-width: 700px), (max-height: 700px) {
+@media (max-width: 700px),
+(max-height: 700px) {
   .start-page-header {
     padding: 14px max(16px, env(safe-area-inset-right)) 14px max(16px, env(safe-area-inset-left));
   }
 
-  .sp-logo-area > svg {
+  .sp-logo-area>svg {
     width: 46px;
     height: 46px;
     padding: 8px;
@@ -717,4 +728,227 @@
   .start-page-footer {
     padding-top: 16px;
   }
+}
+
+/* Customer Entry Popup Overlay */
+.customer-popup-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+/* Popup Box */
+.customer-popup {
+  position: relative;
+  width: 420px;
+  max-width: 90%;
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 30px;
+  box-shadow: 0 15px 45px rgba(0, 0, 0, 0.3);
+  animation: customerPopupOpen 0.25s ease;
+}
+
+.customer-popup h2 {
+  margin: 0 0 25px;
+  text-align: center;
+  font-size: 28px;
+  font-weight: 700;
+  color: #222;
+}
+
+/* Close Button */
+.customer-popup-close {
+  position: absolute;
+  top: 12px;
+  right: 15px;
+  width: 35px;
+  height: 35px;
+  border: none;
+  background: transparent;
+  font-size: 30px;
+  line-height: 30px;
+  color: #777;
+  cursor: pointer;
+}
+
+.customer-popup-close:hover {
+  color: #000;
+}
+
+/* Labels */
+.customer-popup label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+/* Inputs */
+.customer-popup input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 14px 15px;
+  margin-bottom: 20px;
+  border: 1px solid #d5d5d5;
+  border-radius: 10px;
+  font-size: 16px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.customer-popup input:focus {
+  border-color: #f28c28;
+  box-shadow: 0 0 0 3px rgba(242, 140, 40, 0.12);
+}
+
+/* Continue Button */
+.customer-popup>button:last-child {
+  width: 100%;
+  padding: 14px;
+  border: none;
+  border-radius: 10px;
+  background: #f28c28;
+  color: #fff;
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.customer-popup>button:last-child:hover {
+  background: #df7815;
+  transform: translateY(-1px);
+}
+
+/* Animation */
+@keyframes customerPopupOpen {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Mobile */
+@media (max-width: 600px) {
+  .customer-popup {
+    width: 90%;
+    padding: 25px 20px;
+  }
+
+  .customer-popup h2 {
+    font-size: 24px;
+  }
+}
+
+.customer-found-box {
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.customer-found-box:hover {
+  transform: scale(1.02);
+}
+
+.customer-found-box.selected-customer {
+  border: 2px solid #ff8c00;
+  background: #fff4e6;
+}
+
+.customer-table {
+  width: 100%;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-top: 20px;
+}
+
+.customer-table-header,
+.customer-table-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.customer-table-header {
+  background: #f1eee8;
+  font-weight: 700;
+  color: #536174;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.customer-table-header div,
+.customer-table-row div {
+  padding: 12px 15px;
+  border-right: 1px solid #ddd;
+}
+
+.customer-table-header div:last-child,
+.customer-table-row div:last-child {
+  border-right: none;
+}
+
+.customer-table-row {
+  font-size: 16px;
+  cursor: pointer;
+  border-top: 1px solid #ddd;
+  background: white;
+}
+
+.customer-table-row:hover {
+  background: #fff4e9;
+}
+
+.customer-table-row:active {
+  background: #ffe5cc;
+}
+
+.customer-list-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.customer-list-popup {
+  width: 480px;
+  max-width: 90vw;
+  max-height: 80vh;
+  overflow-y: auto;
+  background: white;
+  border-radius: 18px;
+  padding: 25px;
+  position: relative;
+  box-sizing: border-box;
+}
+
+.customer-list-popup h2 {
+  text-align: center;
+  font-size: 26px;
+  font-weight: 800;
+  margin: 5px 0 20px;
+}
+
+.customer-list-close {
+  position: absolute;
+  top: 12px;
+  right: 15px;
+  border: none;
+  background: transparent;
+  font-size: 30px;
+  font-weight: 500;
+  cursor: pointer;
 }

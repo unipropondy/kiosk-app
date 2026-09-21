@@ -84,6 +84,7 @@ function App() {
 
   const skipSaveRef = useRef(false);
   const cartHydratedRef = useRef(false);
+  const [cartReady, setCartReady] = useState(false);
   const deleteInProgressRef = useRef(false);
   const actionRef = useRef(""); // "INSERT", "UPDATE", "DELETE"
   const pendingSaveRef = useRef(null); // tracks in-flight saveCartToBackend promise
@@ -96,6 +97,7 @@ function App() {
   const API = `${BASE_URL}/api`;
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState([]);
+  const [previousDish, setPreviousDish] = useState(null);
   const [serviceChargePercent, setServiceChargePercent] = useState(0);
   const [gstPercent, setGstPercent] = useState(0);
   const [isCartLoading, setIsCartLoading] = useState(false);
@@ -304,9 +306,11 @@ function App() {
       }
       loadCart(restoredTableId).finally(() => {
         cartHydratedRef.current = true;
+        setCartReady(true);
       });
     } else {
       cartHydratedRef.current = true;
+      setCartReady(true);
     }
 
   }, []);
@@ -1567,12 +1571,14 @@ function App() {
     }
   };
 
-  const loadCart = async (tableIdParam) => {
+  const loadCart = async (tableIdParam, orderIdOverride) => {
     try {
       let url;
-      // For kiosk sessions, fetch by order number, not by tableId
-      if (isKiosk && currentOrderId) {
-        url = `${API}/order/cart/kiosk/${currentOrderId}`;
+      // For kiosk sessions, fetch by order number, not by tableId.
+      // Use orderIdOverride when state hasn't updated yet (e.g. called from onStart).
+      const kioskOrderId = orderIdOverride || (isKiosk ? currentOrderId : null);
+      if (kioskOrderId) {
+        url = `${API}/order/cart/kiosk/${kioskOrderId}`;
       } else if (tableIdParam) {
         url = `${API}/order/cart/${tableIdParam}`;
       } else {
@@ -1632,6 +1638,30 @@ function App() {
       if (data.currentOrderId !== undefined) {
         setCurrentOrderId(data.currentOrderId);
         currentOrderIdRef.current = data.currentOrderId;
+      }
+
+      // Auto-add the customer's assigned dish (only on the first load, right after cart is hydrated)
+      const pendingDishId = localStorage.getItem("kioskDefaultDishId");
+      if (pendingDishId) {
+        // Claim it immediately to prevent double-add from socket re-syncs
+        localStorage.removeItem("kioskDefaultDishId");
+        try {
+          const dishRes = await fetch(`${API}/dishes/all`);
+          const allDishes = await dishRes.json();
+          if (Array.isArray(allDishes)) {
+            const assignedDish = allDishes.find(
+              (d) => String(d.DishId) === String(pendingDishId)
+            );
+            if (assignedDish) {
+              console.log("SETTING CUSTOMER PREVIOUS DISH:", assignedDish);
+              setPreviousDish(assignedDish);
+            } else {
+              console.log("Assigned dish not found in menu:", pendingDishId);
+            }
+          }
+        } catch (err) {
+          console.error("AUTO ADD CUSTOMER DISH ERROR:", err);
+        }
       }
 
     } catch (err) {
@@ -2059,13 +2089,22 @@ function App() {
         <KioskStartPage
           onStart={(user, selectedTable) => {
             const storedKioskOrderId = localStorage.getItem("kioskOrderId");
+            const resolvedTableId = selectedTable?.tableId || localStorage.getItem("tableId") || "";
             setIsKiosk(true);
             setCurrentOrderId(storedKioskOrderId);
             currentOrderIdRef.current = storedKioskOrderId;
-            setTableId(selectedTable?.tableId || localStorage.getItem("tableId") || "");
+            setTableId(resolvedTableId);
             setTableNo(selectedTable?.tableNo || localStorage.getItem("tableNo") || "");
             setShowKioskStartPage(false);
             setIsLoggedIn(true);
+
+            // The main useEffect([]) already ran before this session was created,
+            // so loadCart was never called for this order. Call it now so the cart
+            // is hydrated immediately (this also triggers the kioskDefaultDishId auto-add).
+            cartHydratedRef.current = false;
+            loadCart(resolvedTableId, storedKioskOrderId).finally(() => {
+              cartHydratedRef.current = true;
+            });
           }}
         />
       );
@@ -2300,6 +2339,51 @@ function App() {
                           {group.DishGroupName}
                         </button>
                       ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Previous Dish Section */}
+                {!showCartPage && previousDish && (categories.find(c => c.CategoryId === activeCategory)?.KitchenTypeName?.toLowerCase() === "previous") && (
+                  <div className="previous-dish-container" style={{ margin: '0 16px 20px', padding: '16px', background: 'rgba(249, 115, 22, 0.08)', borderRadius: '16px', border: '2px solid #f97316' }}>
+                    <h3 style={{ margin: '0 0 12px', fontSize: '18px', fontWeight: 'bold', color: '#ea580c', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 8 12 12 14 14"></polyline></svg>
+                      Previous Entry
+                    </h3>
+                    <div
+                      className="new-kiosk-dish-item card-style"
+                      onClick={() => {
+                        if (!previousDish.IsSoldOut) openModifiers(previousDish);
+                      }}
+                      style={{ margin: 0, width: '100%' }}
+                    >
+                      <div className="dish-card-heart">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+                      </div>
+                      <div className="new-kiosk-dish-img">
+                        {previousDish.HasImage ? (
+                          <img
+                            src={`${API}/image/${previousDish.Image}`}
+                            alt={previousDish.Name}
+                          />
+                        ) : (
+                          <div className="dish-placeholder">
+                            <ForkKnifeIcon />
+                          </div>
+                        )}
+                      </div>
+                      <div className="new-kiosk-dish-info">
+                        <div className="new-kiosk-dish-name">{previousDish.Name}</div>
+                        <div className="new-kiosk-dish-desc">
+                          {previousDish.Description || "Premium Car Care. Exceptional Service."}
+                        </div>
+                        <div className="new-kiosk-dish-price">
+                          ${Number(previousDish.Price || 0).toFixed(2)}
+                        </div>
+                        {previousDish.IsSoldOut && (
+                          <div className="sold-out-badge">Sold Out</div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}
