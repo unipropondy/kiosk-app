@@ -1227,6 +1227,8 @@ function App() {
           tableNo,
           tableId,
           kioskOrderType: isKiosk ? localStorage.getItem("kioskOrderType") : undefined,
+          kioskCarNumber: isKiosk ? (localStorage.getItem("kioskCarNumber") || undefined) : undefined,
+          kioskCustomerName: isKiosk ? (localStorage.getItem("kioskCustomerName") || undefined) : undefined,
           totalAmount: parseFloat(amount),
           paymentMethod: "ONLINE",
           promoAmount,
@@ -1250,6 +1252,9 @@ function App() {
       if (isKiosk) {
         localStorage.removeItem("kioskOrderId");
         localStorage.removeItem("kioskOrderType");
+        // Clean up temporary customer keys (already sent to backend for upsert)
+        localStorage.removeItem("kioskCarNumber");
+        localStorage.removeItem("kioskCustomerName");
       }
 
       setTimeout(() => {

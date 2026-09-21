@@ -342,7 +342,7 @@ export default function KioskStartPage({ onStart }) {
                             setCustomerData(customer);
                             setCustomerName(customer.CustomerName || "");
                             setCarNumber(customer.CarNumber || "");
-                            localStorage.setItem("kioskCustomer", JSON.stringify(customer));
+                            // Do NOT save kioskCustomer here — saved only after payment success
                             setShowCustomerListPopup(false);
                           }}
                         >
@@ -364,16 +364,14 @@ export default function KioskStartPage({ onStart }) {
                   return;
                 }
 
-                // Save selected customer/car for the next screen
+                // Save car number and customer name temporarily for post-payment upsert
                 localStorage.setItem("kioskCarNumber", carNumber.trim());
+                localStorage.setItem("kioskCustomerName", customerName.trim());
+
+                // Do NOT save kioskCustomer here — it will be saved after payment success
 
                 if (customerData && !Array.isArray(customerData)) {
-                  localStorage.setItem(
-                    "kioskCustomer",
-                    JSON.stringify(customerData)
-                  );
-
-                  // Save the dish already assigned to this car
+                  // Save the dish already assigned to this car (for auto-add on ordering screen)
                   if (customerData.DefaultDishId) {
                     localStorage.setItem(
                       "kioskDefaultDishId",

@@ -1558,7 +1558,7 @@ router.post("/complete-online-payment", async (req, res) => {
   const transaction = new sql.Transaction(pool);
 
   try {
-    const { orderId, tableNo, tableId, totalAmount, cart, paymentMethod, gatewayReference, GatewayReference } = req.body;
+    const { orderId, tableNo, tableId, totalAmount, cart, paymentMethod, gatewayReference, GatewayReference, kioskCarNumber, kioskCustomerName } = req.body;
 
     console.log("🔍 [PAYMENT] complete-online-payment called", {
       orderId,
@@ -1979,7 +1979,72 @@ router.post("/complete-online-payment", async (req, res) => {
     await transaction.commit();
     console.log(`✅ [PAYMENT] ✅✅✅ ALL COMPLETE for order ${orderId}`);
 
-    // KOT already generated before transaction began to ensure only new items print
+    // ── POST-PAYMENT: UPSERT kioskCustomer ────────────────────────────────────
+    // Only runs if this was a kiosk order with a car number provided.
+    // Retrieves the first DishId from SettlementItemDetail and saves/updates the customer record.
+    if (kioskCarNumber && kioskCarNumber.trim()) {
+      try {
+        const trimmedCarNumber = kioskCarNumber.trim().toUpperCase();
+        const trimmedCustomerName = (kioskCustomerName || "").trim();
+
+        // Get the first DishId from the SettlementItemDetail just inserted
+        const dishRes = await pool.request()
+          .input("sid", sql.UniqueIdentifier, settlementId)
+          .query(`
+            SELECT TOP 1 DishId
+            FROM SettlementItemDetail
+            WHERE SettlementID = @sid
+              AND DishId IS NOT NULL
+            ORDER BY OrderDateTime ASC
+          `);
+        const defaultDishId = dishRes.recordset[0]?.DishId || null;
+
+        // Check if customer already exists (by CarNumber)
+        const existingRes = await pool.request()
+          .input("CarNumber", sql.NVarChar(50), trimmedCarNumber)
+          .query(`
+            SELECT TOP 1 CustomerVehicleId
+            FROM kioskCustomer
+            WHERE CarNumber = @CarNumber AND IsActive = 1
+          `);
+
+        if (existingRes.recordset.length > 0) {
+          // UPDATE existing customer: refresh name and DefaultDishId
+          const existingId = existingRes.recordset[0].CustomerVehicleId;
+          await pool.request()
+            .input("CustomerVehicleId", sql.UniqueIdentifier, existingId)
+            .input("CustomerName", sql.NVarChar(100), trimmedCustomerName || null)
+            .input("DefaultDishId", sql.UniqueIdentifier, defaultDishId)
+            .query(`
+              UPDATE kioskCustomer
+              SET
+                CustomerName = COALESCE(@CustomerName, CustomerName),
+                DefaultDishId = COALESCE(@DefaultDishId, DefaultDishId),
+                ModifiedOn = GETDATE()
+              WHERE CustomerVehicleId = @CustomerVehicleId
+            `);
+          console.log(`✅ [KIOSK CUSTOMER] Updated existing customer: ${trimmedCarNumber}`);
+        } else {
+          // INSERT new customer record
+          const newId = crypto.randomUUID();
+          await pool.request()
+            .input("CustomerVehicleId", sql.UniqueIdentifier, newId)
+            .input("CustomerName", sql.NVarChar(100), trimmedCustomerName || "Guest")
+            .input("CarNumber", sql.NVarChar(50), trimmedCarNumber)
+            .input("DefaultDishId", sql.UniqueIdentifier, defaultDishId)
+            .query(`
+              INSERT INTO kioskCustomer
+                (CustomerVehicleId, CustomerName, CarNumber, DefaultDishId, IsActive, CreatedOn)
+              VALUES
+                (@CustomerVehicleId, @CustomerName, @CarNumber, @DefaultDishId, 1, GETDATE())
+            `);
+          console.log(`✅ [KIOSK CUSTOMER] Inserted new customer: ${trimmedCarNumber}`);
+        }
+      } catch (custErr) {
+        // Non-fatal: log but do not fail the payment response
+        console.error("⚠️ [KIOSK CUSTOMER] Failed to upsert kioskCustomer:", custErr.message);
+      }
+    }
 
     try {
       // Also print checkout receipt for online payments
