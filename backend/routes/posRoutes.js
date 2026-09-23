@@ -34,7 +34,7 @@ router.get("/kitchens", async (req, res) => {
       FROM CategoryMaster cm
       LEFT JOIN CategoryKitchenType ckt ON cm.CategoryId = ckt.CategoryId
       WHERE cm.IsActive = 1
-      AND ISNULL(cm.IsPublished,0) = 0
+      
       ORDER BY cm.SortCode ASC
     `);
     setCache("kitchens", result.recordset);
@@ -58,7 +58,7 @@ router.get("/dishgroups/all", async (req, res) => {
         DishGroupName
       FROM DishGroupMaster
       WHERE IsActive = 1
-      AND ISNULL(IsPublished,0) = 0
+      
       ORDER BY DishGroupName ASC
     `);
     setCache(cacheKey, result.recordset);
@@ -89,8 +89,7 @@ router.get("/dishgroups/:CategoryId", async (req, res) => {
           LEFT JOIN CategoryMaster cm
               ON cm.CategoryId = @CategoryId
           WHERE a.IsActive = 1
-          AND ISNULL(a.IsPublished,0) = 0
-          AND (
+        AND (
                 a.CategoryId = @CategoryId
                 OR dkt.KitchenTypeName = cm.CategoryName
           )
@@ -131,7 +130,7 @@ router.get("/dishes/all", async (req, res) => {
         SELECT *, ROW_NUMBER() OVER(PARTITION BY KitchenTypeValue ORDER BY PrinterId) as rn 
         FROM PrintMaster WHERE IsActive = 1 AND PrinterType = 2
       ) pm ON CAST(ckt.KitchenTypeCode AS INT) = pm.KitchenTypeValue AND pm.rn = 1
-      WHERE d.IsActive = 1 AND ISNULL(d.IsPublished,0) = 0 ORDER BY d.SordCode ASC
+      WHERE d.IsActive = 1  ORDER BY d.SordCode ASC
     `);
     setCache(cacheKey, result.recordset);
     res.json(result.recordset);
@@ -196,7 +195,7 @@ router.get("/dishes/group/:DishGroupId", async (req, res) => {
           AND pm.rn = 1
  
           WHERE d.IsActive = 1
-          AND ISNULL(d.IsPublished,0) = 0
+    
           AND (
                 d.DishGroupId = @DishGroupId
                 OR dmap.DishGroupId = @DishGroupId
