@@ -349,15 +349,17 @@ async function generateAndQueueKOTs(orderId) {
     }
 
     // 3. Group Items by Printer Name (to keep KOT slips separated by kitchen type)
-    let fallbackKitchenIp = '192.168.68.184';
+    let fallbackKitchenIp = '192.168.0.199';
     try {
       const fallbackRes = await pool.request().query(`
-            SELECT TOP 1 PrinterPath 
-            FROM PrintMaster 
-            WHERE PrinterType = 2 AND IsActive = 1 AND PrinterPath IS NOT NULL AND PrinterPath <> ''
-        `);
-      if (fallbackRes.recordset.length > 0) {
-        fallbackKitchenIp = fallbackRes.recordset[0].PrinterPath;
+        SELECT TOP 1 ISNULL(NULLIF(PrinterIP, ''), PrinterPath) as PrinterIP
+        FROM PrintMaster 
+        WHERE IsActive = 1 AND PrinterIP IS NOT NULL AND PrinterIP <> '' 
+          AND PrinterIP <> '192.168.0.150' AND PrinterIP <> '192.168.68.184'
+        ORDER BY CASE WHEN PrinterType = 1 THEN 1 WHEN PrinterType = 3 THEN 2 ELSE 3 END
+      `);
+      if (fallbackRes.recordset.length > 0 && fallbackRes.recordset[0].PrinterIP) {
+        fallbackKitchenIp = fallbackRes.recordset[0].PrinterIP;
       }
     } catch (err) {
       console.error("[generateAndQueueKOTs] Fallback IP fetch error:", err.message);
@@ -370,9 +372,12 @@ async function generateAndQueueKOTs(orderId) {
         return;
       }
       const pName = item.PrinterName || 'Kitchen Printer';
-      const ip = item.PrinterIP || fallbackKitchenIp;
+      let ip = item.PrinterIP || item.PrinterPath;
+      if (!ip || ip === '192.168.0.150' || ip === '192.168.68.184' || ip.trim() === '') {
+        ip = fallbackKitchenIp;
+      }
       if (!item.PrinterName) console.log(`[generateAndQueueKOTs] WARNING: item '${item.name}' has no PrinterName → using fallback '${pName}'`);
-      if (!item.PrinterIP) console.log(`[generateAndQueueKOTs] WARNING: item '${item.name}' has no PrinterIP → using fallback '${ip}'`);
+      if (!item.PrinterIP || item.PrinterIP === '192.168.0.150') console.log(`[generateAndQueueKOTs] WARNING: item '${item.name}' IP was '${item.PrinterIP}' → resolved to '${ip}'`);
 
       if (!printerGroups[pName]) {
         printerGroups[pName] = {
