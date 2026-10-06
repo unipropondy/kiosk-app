@@ -335,16 +335,16 @@ async function generateAndQueueKOTs(orderId) {
         LEFT JOIN CategoryKitchenType ckt ON dgm.CategoryId = ckt.CategoryId
         LEFT JOIN PrintMaster pm ON CAST(ckt.KitchenTypeCode AS VARCHAR(50)) = CAST(pm.KitchenTypeValue AS VARCHAR(50)) AND pm.PrinterType = 2
         WHERE h.OrderNumber = @orderNo
-        AND d.StatusCode = 1
+        AND d.StatusCode IN (1, 2)
       `);
 
     const items = itemsRes.recordset;
-    console.log(`[generateAndQueueKOTs] Items loaded: ${items.length} item(s) with StatusCode = 1`);
+    console.log(`[generateAndQueueKOTs] Items loaded: ${items.length} item(s) with StatusCode IN (1, 2)`);
     items.forEach((item, idx) => {
-      console.log(`  [item ${idx + 1}] name='${item.name}' PrinterName='${item.PrinterName}' PrinterIP='${item.PrinterIP}' IsPrinterEnabled=${item.IsPrinterEnabled} StatusCode=1`);
+      console.log(`  [item ${idx + 1}] name='${item.name}' PrinterName='${item.PrinterName}' PrinterIP='${item.PrinterIP}' IsPrinterEnabled=${item.IsPrinterEnabled} StatusCode=${item.StatusCode}`);
     });
     if (items.length === 0) {
-      console.log(`[generateAndQueueKOTs] EARLY EXIT: No items with StatusCode=1 for order '${orderId}'.`);
+      console.log(`[generateAndQueueKOTs] EARLY EXIT: No active items (StatusCode 1 or 2) for order '${orderId}'.`);
       return;
     }
 

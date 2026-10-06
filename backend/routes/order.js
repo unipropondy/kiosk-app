@@ -1491,29 +1491,21 @@ router.post("/mark-sent", async (req, res) => {
 
     const pool = await poolPromise;
 
-    const appSettings = await pool.request().query(`
-      SELECT TOP 1 Enablekotqr
-      FROM AppSettings
-    `);
+    try {
+      await generateAndQueueKOTs(orderId);
+    } catch (err) {
+      console.error("Failed to queue KOT for mark-sent:", err);
+    }
 
-    const enableKotQr = Number(appSettings.recordset[0]?.Enablekotqr || 0);
-
-    const finalStatusCode = enableKotQr === 1 ? 2 : 1;
-
-    console.log("Enablekotqr =", enableKotQr);
-    console.log("Final Status =", finalStatusCode);
-
-    if (enableKotQr === 1) {
-      try {
-        await generateAndQueueKOTs(orderId);
-      } catch (err) {
-        console.error("Failed to queue KOT for mark-sent:", err);
-      }
+    try {
+      await generateAndQueueReceipt(orderId, "CASH");
+    } catch (err) {
+      console.error("Failed to queue receipt for mark-sent:", err);
     }
 
     const result = await pool.request()
       .input("orderNo", sql.NVarChar(50), orderId)
-      .input("statusCode", sql.Int, finalStatusCode)
+      .input("statusCode", sql.Int, 2)
       .query(`
         UPDATE RestaurantOrderDetailCur
         SET StatusCode = @statusCode
@@ -1526,13 +1518,13 @@ router.post("/mark-sent", async (req, res) => {
 
     console.log("Rows Updated:", result.rowsAffected);
 
-    if (enableKotQr === 1 && req.io) {
+    if (req.io) {
       req.io.emit("qr-print-request", {
         orderId: orderId,
         source: "QR",
         paymentType: "cashier",
         printKOT: true,
-        printBill: false
+        printBill: true
       });
     }
 
@@ -1577,13 +1569,6 @@ router.post("/complete-online-payment", async (req, res) => {
     const amount = parseFloat(totalAmount) || 0;
     const pMethod = (paymentMethod || "ONLINE").toUpperCase();
     let settlementId = crypto.randomUUID();
-
-    // Generate and queue KOT for any newly added items (StatusCode = 1) before they are updated to 2
-    try {
-      await generateAndQueueKOTs(orderId);
-    } catch (err) {
-      console.error("Failed to queue KOT for online payment:", err);
-    }
 
     await transaction.begin();
 
@@ -2047,8 +2032,15 @@ router.post("/complete-online-payment", async (req, res) => {
     }
 
     try {
-      // Also print checkout receipt for online payments
-      await generateAndQueueReceipt(orderId, "ONLINE");
+      // Queue KOT print for kitchen
+      await generateAndQueueKOTs(orderId);
+    } catch (err) {
+      console.error("Failed to queue KOT for online payment:", err);
+    }
+
+    try {
+      // Queue checkout receipt for online payments
+      await generateAndQueueReceipt(orderId, pMethod);
     } catch (err) {
       console.error("Failed to queue receipt:", err);
     }

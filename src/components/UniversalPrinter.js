@@ -447,16 +447,16 @@ function formatKOTThermalText(data, type) {
     for (const [kName, groupItems] of Object.entries(kitchenGroups)) {
       text += `\n[L]<B>${kName}</B>\n`;
       text += "[L]--------------------------------\n";
-      groupItems.forEach((item) => {
+      for (const item of groupItems) {
         text += renderThermalItem(item);
-      });
+      }
       text += "[L]--------------------------------\n";
     }
   } else {
-    items.forEach((item) => {
+    for (const item of items) {
       text += renderThermalItem(item);
       text += "[L]--------------------------------\n";
-    });
+    }
   }
 
   text += `[L]Order By: ${waiter}\n`;
