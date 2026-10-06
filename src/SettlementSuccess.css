@@ -85,12 +85,13 @@
 
 .confirmation-order-label > span.confirmation-order-number {
   display: inline-block;
-  font-size: clamp(82px, 12vw, 190px);
-  letter-spacing: 0.04em;
-  line-height: 0.9;
+  font-size: clamp(32px, 6vw, 70px);
+  letter-spacing: 0.02em;
+  line-height: 1.1;
   color: var(--theme-color);
   font-weight: 900;
   text-shadow: 0 2px 0 rgba(0,0,0,0.04);
+  word-break: break-all;
 }
 
 .confirmation-subtitle {

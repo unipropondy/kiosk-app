@@ -96,21 +96,33 @@ function SettlementSuccess() {
 
   const loadOrderDetails = useCallback(async () => {
     try {
-      const orderId = searchParams.get("orderId") || new URLSearchParams(window.location.search).get("orderId");
+      const orderId =
+        searchParams.get("orderId") ||
+        new URLSearchParams(window.location.search).get("orderId");
+
       if (!orderId) return;
 
-      const res = await fetch(`${API}/order/order-details/${orderId}`);
+      const res = await fetch(
+        `${API}/order/order-details/${encodeURIComponent(orderId)}`
+      );
+
       const data = await res.json();
 
       if (Array.isArray(data) && data.length > 0) {
-        if (data[0].OrderNumber) setOrderNumber(data[0].OrderNumber);
+        const dbOrderNumber = data[0]?.OrderNumber;
 
-        // Get the highest StatusCode among all items
-        const maxStatus = Math.max(...data.map(d => Number(d.StatusCode || 2)));
+        if (dbOrderNumber) {
+          setOrderNumber(String(dbOrderNumber).trim());
+        }
+
+        const maxStatus = Math.max(
+          ...data.map((d) => Number(d.StatusCode || 2))
+        );
+
         setStatusCode(maxStatus);
       }
     } catch (err) {
-      console.log(err);
+      console.log("Failed to load order details:", err);
     }
   }, [API, searchParams]);
 
@@ -136,7 +148,7 @@ function SettlementSuccess() {
     try {
       const res = await fetch(`${API}/order/order-items/${orderId}`);
       const data = await res.json();
-
+      console.log("ORDER DETAILS API:", data);
       console.log("ORDER ITEMS API:", data);
 
       if (data.success) {
@@ -154,7 +166,7 @@ function SettlementSuccess() {
     loadOrderItems();
   };
 
-  const orderSuffix = String(orderNumber || "").replace(/\D/g, "").slice(-4) || "----";
+  const orderSuffix = orderNumber || "----";
   const activeStep = getActiveStep(statusCode);
   const currentStatus = STATUS_STEPS[activeStep];
 
@@ -275,7 +287,7 @@ function SettlementSuccess() {
               </div>
               <div>
                 <div className="od-title">Order Details</div>
-                {orderNumber && <div className="od-subtitle">Order #{String(orderNumber).replace(/\D/g, "").slice(-4)}</div>}
+                {orderNumber && <div className="od-subtitle">Order #{orderNumber}</div>}
               </div>
               <button className="od-close-btn" onClick={() => setShowOrderDetails(false)}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

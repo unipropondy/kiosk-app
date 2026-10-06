@@ -1260,12 +1260,12 @@ function App() {
       setTimeout(() => {
         if (isKiosk) {
           showKioskThankYouThen(
-            posOrderId,
-            `/settlement-success?kiosk=1&tableId=${encodeURIComponent(tableId)}&table=${encodeURIComponent(tableNo)}&orderId=${encodeURIComponent(posOrderId)}`
+            data.orderId,
+            `/settlement-success?kiosk=1&tableId=${encodeURIComponent(tableId)}&table=${encodeURIComponent(tableNo)}&orderId=${encodeURIComponent(data.orderId)}`
           );
         } else {
           window.location.href =
-            `/settlement-success?tableId=${tableId}&table=${tableNo}&orderId=${posOrderId}`;
+            `/settlement-success?tableId=${tableId}&table=${tableNo}&orderId=${data.orderId}`;
         }
       }, 1000);
 
@@ -3036,9 +3036,8 @@ function App() {
                     </div>
                     */}
 
-                    {/* Hidden: Cash/EZ Link button */}
-                    {/* 
-                    <div className="payment-mode-card" onClick={async () => {
+                    {/* Card 3: Cash */}
+                    <div className="payment-mode-card paynow-card" style={{ borderColor: '#16a34a', background: '#f0fdf4' }} onClick={async () => {
                       try {
                         await fetch(`${API}/order/mark-sent`, {
                           method: "POST",
@@ -3074,13 +3073,11 @@ function App() {
                       }
 
                     }}>
-                      <div className="payment-mode-icons split-icons">
+                      <div className="payment-mode-icons" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '110px' }}>
                         <CashBrand />
-                        <EzlinkBrand />
                       </div>
-                      <div className="payment-mode-label">Cash/EZ Link</div>
+                      <div className="payment-mode-label" style={{ color: '#15803d', fontSize: '22px', fontWeight: 'bold', marginTop: '8px' }}>Cash</div>
                     </div>
-                    */}
                   </div>
                 </div>
               </div>
