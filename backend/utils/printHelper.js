@@ -29,7 +29,6 @@ function formatThermalTextWithDiscount(saleData, company, discountInfo) {
 
   const now = new Date();
   const dateStr = formatToSingaporeDate(now);
-  // 12-hour time with AM/PM (e.g. 02:11 PM)
   const timeStr = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Asia/Singapore",
     hour: "2-digit",
@@ -114,7 +113,6 @@ function formatThermalTextWithDiscount(saleData, company, discountInfo) {
       : items.reduce((s, i) => s + Number(i.price || i.Price || 0) * Number(i.quantity || i.qty || 1), 0)
   );
 
-  // Helper: left label + right-aligned value on a 40-char line
   const totalLine = (label, value) => {
     const valStr = `${symbol}${Number(value).toFixed(2)}`;
     return "[L]" + label + valStr.padStart(40 - label.length) + "\n";
@@ -144,7 +142,6 @@ function formatThermalTextWithDiscount(saleData, company, discountInfo) {
 
   text += "[L]------------------------------------------------\n";
 
-  // ── Payment line (e.g. "CASH        $6.00") ──────────────────────────────
   const payMode = (saleData.payMode || saleData.paymentMode || saleData.PaymentMode || "CASH").toUpperCase();
   const total = Number(saleData.total || saleData.totalAmount || saleData.grandTotal || 0);
   const totalStr2 = `${symbol}${total.toFixed(2)}`;
@@ -271,15 +268,15 @@ function formatKOTThermalText(data, itemsForPrinter, type) {
     for (const [kName, groupItems] of Object.entries(kitchenGroups)) {
       text += `\n[L]<B>${kName}</B>\n`;
       text += "[L]--------------------------------\n";
-      groupItems.forEach((item) => {
+      for (const item of groupItems) {
         text += renderThermalItem(item);
-      });
+      }
       text += "[L]--------------------------------\n";
     }
   } else {
-    itemsForPrinter.forEach((item) => {
+    for (const item of itemsForPrinter) {
       text += renderThermalItem(item);
-    });
+    }
     text += "[L]--------------------------------\n";
   }
 
@@ -315,7 +312,7 @@ async function generateAndQueueKOTs(orderId) {
     const orderHeader = orderRes.recordset[0];
     console.log(`[generateAndQueueKOTs] Order found: ${orderHeader.OrderNumber} (TableNo: ${orderHeader.tableNo})`);
 
-    // 2. Load Items & Resolve Printer
+    // 2. Load Items & Resolve Printer from PrintMaster
     const itemsRes = await pool.request()
       .input("orderNo", sql.NVarChar(50), orderId)
       .query(`
@@ -325,7 +322,7 @@ async function generateAndQueueKOTs(orderId) {
           d.ComboDetailsJSON,
           ISNULL(ckt.KitchenTypeName, cat.CategoryName) as KitchenTypeName,
           pm.PrinterName,
-          pm.PrinterPath as PrinterIP,
+          ISNULL(NULLIF(LTRIM(RTRIM(pm.PrinterIP)), ''), LTRIM(RTRIM(pm.PrinterPath))) as PrinterIP,
           pm.IsActive as IsPrinterEnabled
         FROM RestaurantOrderDetailCur d 
         JOIN RestaurantOrderCur h ON d.OrderId = h.OrderId 
@@ -333,36 +330,39 @@ async function generateAndQueueKOTs(orderId) {
         LEFT JOIN DishGroupMaster dgm ON dish.DishGroupId = dgm.DishGroupId
         LEFT JOIN CategoryMaster cat ON dgm.CategoryId = cat.CategoryId
         LEFT JOIN CategoryKitchenType ckt ON dgm.CategoryId = ckt.CategoryId
-        LEFT JOIN PrintMaster pm ON CAST(ckt.KitchenTypeCode AS VARCHAR(50)) = CAST(pm.KitchenTypeValue AS VARCHAR(50)) AND pm.PrinterType = 2
+        LEFT JOIN PrintMaster pm ON CAST(ckt.KitchenTypeCode AS VARCHAR(50)) = CAST(pm.KitchenTypeValue AS VARCHAR(50)) AND pm.PrinterType = 2 AND pm.IsActive = 1
         WHERE h.OrderNumber = @orderNo
         AND d.StatusCode IN (1, 2)
       `);
 
     const items = itemsRes.recordset;
-    console.log(`[generateAndQueueKOTs] Items loaded: ${items.length} item(s) with StatusCode IN (1, 2)`);
-    items.forEach((item, idx) => {
-      console.log(`  [item ${idx + 1}] name='${item.name}' PrinterName='${item.PrinterName}' PrinterIP='${item.PrinterIP}' IsPrinterEnabled=${item.IsPrinterEnabled} StatusCode=${item.StatusCode}`);
-    });
     if (items.length === 0) {
       console.log(`[generateAndQueueKOTs] EARLY EXIT: No active items (StatusCode 1 or 2) for order '${orderId}'.`);
       return;
     }
 
-    // 3. Group Items by Printer Name (to keep KOT slips separated by kitchen type)
-    let fallbackKitchenIp = '192.168.0.199';
+    // 3. Resolve Dynamic Fallback Printer IP from dbo.PrintMaster
+    let fallbackKitchenIp = '';
+    let fallbackPrinterName = 'Kitchen Printer';
     try {
       const fallbackRes = await pool.request().query(`
-        SELECT TOP 1 ISNULL(NULLIF(PrinterIP, ''), PrinterPath) as PrinterIP
+        SELECT TOP 1 
+          ISNULL(NULLIF(LTRIM(RTRIM(PrinterIP)), ''), LTRIM(RTRIM(PrinterPath))) as PrinterIP,
+          PrinterName 
         FROM PrintMaster 
-        WHERE IsActive = 1 AND PrinterIP IS NOT NULL AND PrinterIP <> '' 
-          AND PrinterIP <> '192.168.0.150' AND PrinterIP <> '192.168.68.184'
-        ORDER BY CASE WHEN PrinterType = 1 THEN 1 WHEN PrinterType = 3 THEN 2 ELSE 3 END
+        WHERE IsActive = 1 
+          AND (
+            (PrinterIP IS NOT NULL AND LTRIM(RTRIM(PrinterIP)) <> '') OR 
+            (PrinterPath IS NOT NULL AND LTRIM(RTRIM(PrinterPath)) <> '')
+          )
+        ORDER BY CASE WHEN PrinterType = 2 THEN 1 WHEN PrinterType = 1 THEN 2 ELSE 3 END
       `);
       if (fallbackRes.recordset.length > 0 && fallbackRes.recordset[0].PrinterIP) {
         fallbackKitchenIp = fallbackRes.recordset[0].PrinterIP;
+        fallbackPrinterName = fallbackRes.recordset[0].PrinterName || 'Kitchen Printer';
       }
     } catch (err) {
-      console.error("[generateAndQueueKOTs] Fallback IP fetch error:", err.message);
+      console.error("[generateAndQueueKOTs] Dynamic PrintMaster fallback fetch error:", err.message);
     }
 
     const printerGroups = {};
@@ -371,13 +371,11 @@ async function generateAndQueueKOTs(orderId) {
         console.log(`[generateAndQueueKOTs] SKIPPED item '${item.name}': IsPrinterEnabled=${item.IsPrinterEnabled}`);
         return;
       }
-      const pName = item.PrinterName || 'Kitchen Printer';
-      let ip = item.PrinterIP || item.PrinterPath;
-      if (!ip || ip === '192.168.0.150' || ip === '192.168.68.184' || ip.trim() === '') {
+      const pName = item.PrinterName || fallbackPrinterName;
+      let ip = item.PrinterIP;
+      if (!ip || ip.trim() === '') {
         ip = fallbackKitchenIp;
       }
-      if (!item.PrinterName) console.log(`[generateAndQueueKOTs] WARNING: item '${item.name}' has no PrinterName → using fallback '${pName}'`);
-      if (!item.PrinterIP || item.PrinterIP === '192.168.0.150') console.log(`[generateAndQueueKOTs] WARNING: item '${item.name}' IP was '${item.PrinterIP}' → resolved to '${ip}'`);
 
       if (!printerGroups[pName]) {
         printerGroups[pName] = {
@@ -388,8 +386,8 @@ async function generateAndQueueKOTs(orderId) {
       }
       printerGroups[pName].items.push(item);
     });
+
     const groupKeys = Object.keys(printerGroups);
-    console.log(`[generateAndQueueKOTs] Printer groups formed: [${groupKeys.join(', ')}]`);
     if (groupKeys.length === 0) {
       console.log(`[generateAndQueueKOTs] EARLY EXIT: All items were skipped (IsPrinterEnabled=0). Nothing to queue.`);
       return;
@@ -397,13 +395,13 @@ async function generateAndQueueKOTs(orderId) {
 
     // 4. Generate Thermal Content & Insert into PrintJobQueue
     for (const [pName, group] of Object.entries(printerGroups)) {
-      let ip;
+      let ip = group.printerIp;
       try {
         const orderData = {
           orderId: orderHeader.OrderId,
           orderNo: orderHeader.OrderNumber,
           tableNo: orderHeader.tableNo,
-          waiterName: "QR POS", // Since it's from QR
+          waiterName: "QR POS",
           kitchenName: group.printerName
         };
 
@@ -411,27 +409,20 @@ async function generateAndQueueKOTs(orderId) {
           .input('PrinterName', sql.NVarChar(100), group.printerName)
           .input('SearchText', sql.NVarChar(100), `%Order #: ${orderHeader.OrderNumber}%`)
           .query(`
-                    SELECT JobId, Status 
-                    FROM PrintJobQueue 
-                    WHERE PrinterName = @PrinterName
-                      AND Content LIKE @SearchText
-                `);
+            SELECT JobId, Status 
+            FROM PrintJobQueue 
+            WHERE PrinterName = @PrinterName
+              AND Content LIKE @SearchText
+          `);
 
         let kotType = "NEW_ORDER";
-
         if (dupCheck.recordset.length > 0) {
-          // If it already exists in the queue (even if pending or completed), it's an additional order for this kitchen
           kotType = "ADDITIONAL";
         }
 
         const thermalText = formatKOTThermalText(orderData, group.items, kotType);
-        ip = group.printerIp;
-        const storeId = "STORE_001"; // Consistent with UniversalPrinter.js
-
-        console.log(`[generateAndQueueKOTs] Processing group: Printer='${group.printerName}' IP='${ip}' Items=${group.items.length} Type=${kotType}`);
-
+        const storeId = "STORE_001";
         const jobId = crypto.randomUUID();
-        console.log(`[generateAndQueueKOTs] Inserting PrintJobQueue: JobId=${jobId} Printer=${group.printerName} IP=${ip} ContentLen=${thermalText.length}`);
 
         await pool.request()
           .input('JobId', sql.UniqueIdentifier, jobId)
@@ -441,20 +432,13 @@ async function generateAndQueueKOTs(orderId) {
           .input('PrinterPort', sql.Int, 9100)
           .input('Content', sql.NVarChar(sql.MAX), thermalText)
           .query(`
-                    INSERT INTO PrintJobQueue (JobId, StoreId, PrinterName, PrinterIp, PrinterPort, Content, Status, CreatedOn, Attempts)
-                    VALUES (@JobId, @StoreId, @PrinterName, @PrinterIp, @PrinterPort, @Content, 'PENDING', GETDATE(), 0)
-                `);
-        console.log(`[generateAndQueueKOTs] INSERT SUCCESS: KOT job ${jobId} queued for IP ${ip}`);
+            INSERT INTO PrintJobQueue (JobId, StoreId, PrinterName, PrinterIp, PrinterPort, Content, Status, CreatedOn, Attempts)
+            VALUES (@JobId, @StoreId, @PrinterName, @PrinterIp, @PrinterPort, @Content, 'PENDING', GETDATE(), 0)
+          `);
+        console.log(`[generateAndQueueKOTs] KOT job ${jobId} queued for Printer '${group.printerName}' (${ip})`);
 
       } catch (innerErr) {
-        console.error("\n================ KOT QUEUE ERROR ================");
-        console.error(`Order   : ${orderHeader?.OrderNumber || orderId}`);
-        console.error(`Printer : ${group?.printerName || 'Unknown'}`);
-        console.error(`IP      : ${ip || group?.printerIp || 'Unknown'}`);
-        console.error(`StoreId : STORE_001`);
-        console.error(`Error   : ${innerErr.message}`);
-        console.error(innerErr.stack);
-        console.error("=================================================\n");
+        console.error(`[generateAndQueueKOTs] Queue error:`, innerErr.message);
       }
     }
 
@@ -462,10 +446,16 @@ async function generateAndQueueKOTs(orderId) {
     try {
       const kdsPrinterRes = await pool.request()
         .query(`
-                SELECT TOP 1 PrinterPath as PrinterIP, PrinterName 
-                FROM PrintMaster 
-                WHERE PrinterType = 4 AND IsActive = 1 AND PrinterPath IS NOT NULL AND PrinterPath <> ''
-            `);
+          SELECT TOP 1 
+            ISNULL(NULLIF(LTRIM(RTRIM(PrinterIP)), ''), LTRIM(RTRIM(PrinterPath))) as PrinterIP, 
+            PrinterName 
+          FROM PrintMaster 
+          WHERE PrinterType = 4 AND IsActive = 1 
+            AND (
+              (PrinterIP IS NOT NULL AND LTRIM(RTRIM(PrinterIP)) <> '') OR 
+              (PrinterPath IS NOT NULL AND LTRIM(RTRIM(PrinterPath)) <> '')
+            )
+        `);
 
       if (kdsPrinterRes.recordset.length > 0) {
         const kdsPrinter = kdsPrinterRes.recordset[0];
@@ -483,11 +473,11 @@ async function generateAndQueueKOTs(orderId) {
           .input('PrinterName', sql.NVarChar(100), kdsPrinter.PrinterName)
           .input('SearchText', sql.NVarChar(100), `%Order #: ${orderHeader.OrderNumber}%`)
           .query(`
-                    SELECT TOP 1 JobId 
-                    FROM PrintJobQueue 
-                    WHERE PrinterName = @PrinterName 
-                      AND Content LIKE @SearchText
-                `);
+            SELECT TOP 1 JobId 
+            FROM PrintJobQueue 
+            WHERE PrinterName = @PrinterName 
+              AND Content LIKE @SearchText
+          `);
 
         let kdsKotType = "KDS_PRINT";
         if (kdsDupCheck.recordset.length > 0) {
@@ -496,8 +486,8 @@ async function generateAndQueueKOTs(orderId) {
 
         const kdsThermalText = formatKOTThermalText(orderData, items, kdsKotType);
         const storeId = "STORE_001";
-
         const kdsJobId = crypto.randomUUID();
+
         await pool.request()
           .input('JobId', sql.UniqueIdentifier, kdsJobId)
           .input('StoreId', sql.NVarChar(50), storeId)
@@ -506,9 +496,9 @@ async function generateAndQueueKOTs(orderId) {
           .input('PrinterPort', sql.Int, 9100)
           .input('Content', sql.NVarChar(sql.MAX), kdsThermalText)
           .query(`
-                    INSERT INTO PrintJobQueue (JobId, StoreId, PrinterName, PrinterIp, PrinterPort, Content, Status, CreatedOn, Attempts)
-                    VALUES (@JobId, @StoreId, @PrinterName, @PrinterIp, @PrinterPort, @Content, 'PENDING', GETDATE(), 0)
-                `);
+            INSERT INTO PrintJobQueue (JobId, StoreId, PrinterName, PrinterIp, PrinterPort, Content, Status, CreatedOn, Attempts)
+            VALUES (@JobId, @StoreId, @PrinterName, @PrinterIp, @PrinterPort, @Content, 'PENDING', GETDATE(), 0)
+          `);
         console.log(`[generateAndQueueKOTs] Queued KDS job ${kdsJobId} for IP ${kdsIp}`);
       }
     } catch (kdsErr) {
@@ -516,11 +506,7 @@ async function generateAndQueueKOTs(orderId) {
     }
 
   } catch (err) {
-    console.error("\n================ KOT QUEUE FATAL ERROR ================");
-    console.error(`OrderId : ${orderId}`);
-    console.error(`Error   : ${err.message}`);
-    console.error(err.stack);
-    console.error("=======================================================\n");
+    console.error("[generateAndQueueKOTs] Fatal Error:", err.message);
   }
 }
 
@@ -532,12 +518,12 @@ async function generateAndQueueReceipt(orderId, paymentMode = 'ONLINE') {
     const orderHeaderRes = await pool.request()
       .input("orderNo", sql.NVarChar(50), orderId)
       .query(`
-            SELECT TOP 1 h.OrderId, h.OrderNumber, LTRIM(RTRIM(h.Tableno)) as tableNo, 
-                   h.TotalAmount, h.ServiceCharge as ServiceChargeAmount, h.TotalTax as GstAmount, 
-                   h.DiscountAmount, h.DiscountPercentage as DiscountValue
-            FROM RestaurantOrderCur h
-            WHERE h.OrderNumber = @orderNo
-        `);
+        SELECT TOP 1 h.OrderId, h.OrderNumber, LTRIM(RTRIM(h.Tableno)) as tableNo, 
+               h.TotalAmount, h.ServiceCharge as ServiceChargeAmount, h.TotalTax as GstAmount, 
+               h.DiscountAmount, h.DiscountPercentage as DiscountValue
+        FROM RestaurantOrderCur h
+        WHERE h.OrderNumber = @orderNo
+      `);
 
     if (orderHeaderRes.recordset.length === 0) return;
     const orderHeader = orderHeaderRes.recordset[0];
@@ -575,25 +561,51 @@ async function generateAndQueueReceipt(orderId, paymentMode = 'ONLINE') {
       String(orderHeader.tableNo).toUpperCase() === 'TAKEAWAY';
     const pType = isTakeaway ? 3 : 1;
 
-    // 5. Fetch Printer IP
-    let printerIp = '192.168.68.178';
+    // 5. Fetch Printer IP dynamically from PrintMaster
+    let printerIp = '';
     let printerName = 'Counter Printer';
 
     const printerRes = await pool.request()
       .input('PrinterType', sql.Int, pType)
-      .query(`SELECT TOP 1 PrinterIP, PrinterName FROM PrintMaster WHERE PrinterType = @PrinterType AND IsActive = 1`);
+      .query(`
+        SELECT TOP 1 
+          ISNULL(NULLIF(LTRIM(RTRIM(PrinterIP)), ''), LTRIM(RTRIM(PrinterPath))) as PrinterIP, 
+          PrinterName 
+        FROM PrintMaster 
+        WHERE PrinterType = @PrinterType AND IsActive = 1 
+          AND (
+            (PrinterIP IS NOT NULL AND LTRIM(RTRIM(PrinterIP)) <> '') OR 
+            (PrinterPath IS NOT NULL AND LTRIM(RTRIM(PrinterPath)) <> '')
+          )
+      `);
 
     if (printerRes.recordset.length > 0 && printerRes.recordset[0].PrinterIP) {
       printerIp = printerRes.recordset[0].PrinterIP;
       printerName = printerRes.recordset[0].PrinterName;
     } else {
-      // Ultimate fallback to Cashier
+      // Dynamic fallback to Cashier or any active printer in PrintMaster
       const cashierRes = await pool.request()
-        .query(`SELECT TOP 1 PrinterIP, PrinterName FROM PrintMaster WHERE PrinterType = 1 AND IsActive = 1`);
+        .query(`
+          SELECT TOP 1 
+            ISNULL(NULLIF(LTRIM(RTRIM(PrinterIP)), ''), LTRIM(RTRIM(PrinterPath))) as PrinterIP, 
+            PrinterName 
+          FROM PrintMaster 
+          WHERE IsActive = 1 
+            AND (
+              (PrinterIP IS NOT NULL AND LTRIM(RTRIM(PrinterIP)) <> '') OR 
+              (PrinterPath IS NOT NULL AND LTRIM(RTRIM(PrinterPath)) <> '')
+            )
+          ORDER BY CASE WHEN PrinterType = 1 THEN 1 WHEN PrinterType = 3 THEN 2 ELSE 3 END
+        `);
       if (cashierRes.recordset.length > 0 && cashierRes.recordset[0].PrinterIP) {
         printerIp = cashierRes.recordset[0].PrinterIP;
         printerName = cashierRes.recordset[0].PrinterName;
       }
+    }
+
+    if (!printerIp) {
+      console.warn("[generateAndQueueReceipt] No active printer configured in PrintMaster");
+      return;
     }
 
     // 6. Format Thermal Text
@@ -623,12 +635,12 @@ async function generateAndQueueReceipt(orderId, paymentMode = 'ONLINE') {
       .input('PrinterIp', sql.NVarChar(100), printerIp)
       .input('SearchText', sql.NVarChar(100), `%Bill No:%${String(orderHeader.OrderNumber).slice(-4)}%`)
       .query(`
-            SELECT TOP 1 JobId 
-            FROM PrintJobQueue 
-            WHERE PrinterIp = @PrinterIp 
-              AND Status IN ('PENDING', 'PROCESSING') 
-              AND Content LIKE @SearchText
-        `);
+        SELECT TOP 1 JobId 
+        FROM PrintJobQueue 
+        WHERE PrinterIp = @PrinterIp 
+          AND Status IN ('PENDING', 'PROCESSING') 
+          AND Content LIKE @SearchText
+      `);
 
     if (dupCheck.recordset.length > 0) {
       console.log(`[generateAndQueueReceipt] Skip: Duplicate receipt for Order ${orderHeader.OrderNumber}`);
@@ -646,21 +658,17 @@ async function generateAndQueueReceipt(orderId, paymentMode = 'ONLINE') {
       .input('PrinterPort', sql.Int, 9100)
       .input('Content', sql.NVarChar(sql.MAX), thermalText)
       .query(`
-            INSERT INTO PrintJobQueue (JobId, StoreId, PrinterName, PrinterIp, PrinterPort, Content, Status, CreatedOn, Attempts)
-            VALUES (@JobId, @StoreId, @PrinterName, @PrinterIp, @PrinterPort, @Content, 'PENDING', GETDATE(), 0)
-        `);
+        INSERT INTO PrintJobQueue (JobId, StoreId, PrinterName, PrinterIp, PrinterPort, Content, Status, CreatedOn, Attempts)
+        VALUES (@JobId, @StoreId, @PrinterName, @PrinterIp, @PrinterPort, @Content, 'PENDING', GETDATE(), 0)
+      `);
 
-    console.log(`[generateAndQueueReceipt] Queued Receipt job ${jobId} for IP ${printerIp}`);
+    console.log(`[generateAndQueueReceipt] Queued Receipt job ${jobId} for Printer '${printerName}' (${printerIp})`);
 
   } catch (err) {
     console.error("[generateAndQueueReceipt] Error:", err);
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Manual KOT Reprint — prints ALL items (StatusCode 1 or 2) as REPRINT
-// Used by cashier/waiter for KDS reprint
-// ─────────────────────────────────────────────────────────────────────────────
 async function reprintKOT(orderId) {
   try {
     const pool = await poolPromise;
@@ -672,21 +680,22 @@ async function reprintKOT(orderId) {
     if (orderRes.recordset.length === 0) { console.log(`[reprintKOT] Order not found: ${orderId}`); return; }
     const orderHeader = orderRes.recordset[0];
 
-    // Fetch ALL active items (not voided/cancelled)
     const itemsRes = await pool.request()
       .input('orderNo', sql.NVarChar(50), orderId)
       .query(`
         SELECT d.OrderDetailId as lineItemId, d.DishId as id, d.Quantity as qty, 
           dish.Name as name, d.Remarks as note, d.ModifiersJSON, d.isTakeAway, d.ComboDetailsJSON,
           ISNULL(ckt.KitchenTypeName, cat.CategoryName) as KitchenTypeName,
-          pm.PrinterName, pm.PrinterPath as PrinterIP, pm.IsActive as IsPrinterEnabled
+          pm.PrinterName,
+          ISNULL(NULLIF(LTRIM(RTRIM(pm.PrinterIP)), ''), LTRIM(RTRIM(pm.PrinterPath))) as PrinterIP,
+          pm.IsActive as IsPrinterEnabled
         FROM RestaurantOrderDetailCur d 
         JOIN RestaurantOrderCur h ON d.OrderId = h.OrderId 
         LEFT JOIN DishMaster dish ON d.DishId = dish.DishId
         LEFT JOIN DishGroupMaster dgm ON dish.DishGroupId = dgm.DishGroupId
         LEFT JOIN CategoryMaster cat ON dgm.CategoryId = cat.CategoryId
         LEFT JOIN CategoryKitchenType ckt ON dgm.CategoryId = ckt.CategoryId
-        LEFT JOIN PrintMaster pm ON CAST(ckt.KitchenTypeCode AS VARCHAR(50)) = CAST(pm.KitchenTypeValue AS VARCHAR(50)) AND pm.PrinterType = 2
+        LEFT JOIN PrintMaster pm ON CAST(ckt.KitchenTypeCode AS VARCHAR(50)) = CAST(pm.KitchenTypeValue AS VARCHAR(50)) AND pm.PrinterType = 2 AND pm.IsActive = 1
         WHERE h.OrderNumber = @orderNo AND d.StatusCode IN (1, 2)
       `);
 
@@ -694,17 +703,32 @@ async function reprintKOT(orderId) {
     if (items.length === 0) { console.log(`[reprintKOT] No items to reprint for order '${orderId}'.`); return; }
 
     let fallbackIp = '';
+    let fallbackName = 'Kitchen Printer';
     try {
-      const fb = await pool.request().query(`SELECT TOP 1 PrinterPath FROM PrintMaster WHERE PrinterType = 2 AND IsActive = 1 AND PrinterPath IS NOT NULL AND PrinterPath <> ''`);
-      if (fb.recordset.length > 0) fallbackIp = fb.recordset[0].PrinterPath;
+      const fb = await pool.request().query(`
+        SELECT TOP 1 
+          ISNULL(NULLIF(LTRIM(RTRIM(PrinterIP)), ''), LTRIM(RTRIM(PrinterPath))) as PrinterIP,
+          PrinterName 
+        FROM PrintMaster 
+        WHERE IsActive = 1 
+          AND (
+            (PrinterIP IS NOT NULL AND LTRIM(RTRIM(PrinterIP)) <> '') OR 
+            (PrinterPath IS NOT NULL AND LTRIM(RTRIM(PrinterPath)) <> '')
+          )
+        ORDER BY CASE WHEN PrinterType = 2 THEN 1 WHEN PrinterType = 1 THEN 2 ELSE 3 END
+      `);
+      if (fb.recordset.length > 0 && fb.recordset[0].PrinterIP) {
+        fallbackIp = fb.recordset[0].PrinterIP;
+        fallbackName = fb.recordset[0].PrinterName || 'Kitchen Printer';
+      }
     } catch (_) { }
 
-    // Group by kitchen printer and queue REPRINT
     const groups = {};
     items.forEach(item => {
       if (item.IsPrinterEnabled === 0 || item.IsPrinterEnabled === false) return;
-      const pName = item.PrinterName || 'Kitchen Printer';
+      const pName = item.PrinterName || fallbackName;
       const ip = item.PrinterIP || fallbackIp;
+      if (!ip) return;
       if (!groups[pName]) groups[pName] = { printerName: pName, printerIp: ip, items: [] };
       groups[pName].items.push(item);
     });
@@ -721,9 +745,18 @@ async function reprintKOT(orderId) {
       console.log(`[reprintKOT] Queued REPRINT: Printer='${group.printerName}' IP=${group.printerIp}`);
     }
 
-    // Also queue on KDS (PrinterType=4)
     try {
-      const kdsRes = await pool.request().query(`SELECT TOP 1 PrinterPath as PrinterIP, PrinterName FROM PrintMaster WHERE PrinterType = 4 AND IsActive = 1 AND PrinterPath IS NOT NULL AND PrinterPath <> ''`);
+      const kdsRes = await pool.request().query(`
+        SELECT TOP 1 
+          ISNULL(NULLIF(LTRIM(RTRIM(PrinterIP)), ''), LTRIM(RTRIM(PrinterPath))) as PrinterIP, 
+          PrinterName 
+        FROM PrintMaster 
+        WHERE PrinterType = 4 AND IsActive = 1 
+          AND (
+            (PrinterIP IS NOT NULL AND LTRIM(RTRIM(PrinterIP)) <> '') OR 
+            (PrinterPath IS NOT NULL AND LTRIM(RTRIM(PrinterPath)) <> '')
+          )
+      `);
       if (kdsRes.recordset.length > 0) {
         const kp = kdsRes.recordset[0];
         const orderData = { orderId: orderHeader.OrderId, orderNo: orderHeader.OrderNumber, tableNo: orderHeader.tableNo, waiterName: 'QR POS', kitchenName: 'KDS' };
@@ -739,7 +772,7 @@ async function reprintKOT(orderId) {
     } catch (kdsErr) { console.error('[reprintKOT] KDS reprint error:', kdsErr.message); }
 
   } catch (err) {
-    console.error('[reprintKOT] Error:', err.message, err.stack);
+    console.error('[reprintKOT] Error:', err.message);
   }
 }
 
