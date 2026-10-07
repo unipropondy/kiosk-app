@@ -354,9 +354,8 @@ class BillPDFGenerator {
     const gstAmount = Math.round(gstAmountRaw * 100) / 100;
     const amountWithoutGST = currentSubtotal;
 
-    if (finalTotal === 0) {
-      finalTotal = taxableAmount + gstAmount;
-    }
+    const extraChargeAmount = parseFloat(saleData.extraCharge || saleData.PaymodeServiceCharge || 0);
+    finalTotal = taxableAmount + gstAmount + extraChargeAmount;
 
     const printedRoundOff =
       saleData.roundOff && saleData.roundOff !== 0

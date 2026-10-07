@@ -154,7 +154,8 @@ function formatThermalTextWithDiscount(saleData, company, discountInfo) {
   text += "[L]------------------------------------------------\n";
 
   const payMode = (saleData.payMode || saleData.paymentMode || saleData.PaymentMode || "CASH").toUpperCase();
-  const total = Number(saleData.total || saleData.totalAmount || saleData.grandTotal || 0);
+  const discountAmt = (discountInfo && discountInfo.applied) ? Number(discountInfo.amount || 0) : 0;
+  const total = subtotal + serviceCharge + extraCharge + gst - discountAmt;
   const totalStr2 = `${symbol}${total.toFixed(2)}`;
   text += "[L]" + payMode + totalStr2.padStart(40 - payMode.length) + "\n";
   text += "[L]------------------------------------------------\n";
@@ -705,7 +706,10 @@ async function generateAndQueueReceipt(orderId, paymentMode = 'ONLINE', passedEx
 
     // 6. Calculate Subtotal and Format Thermal Text
     const calculatedSubtotal = items.reduce((s, i) => s + Number(i.price || 0) * Number(i.qty || 1), 0);
-    const displayTotal = Number(orderHeader.TotalAmount) > 0 ? Number(orderHeader.TotalAmount) : (calculatedSubtotal + extraCharge);
+    const serviceChargeAmt = Number(orderHeader.ServiceChargeAmount) || 0;
+    const gstAmt = Number(orderHeader.GstAmount) || 0;
+    const discountAmt = Number(orderHeader.DiscountAmount) || 0;
+    const displayTotal = calculatedSubtotal + serviceChargeAmt + gstAmt - discountAmt + extraCharge;
 
     const saleData = {
       tableNo: orderHeader.tableNo,
