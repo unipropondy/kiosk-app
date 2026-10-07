@@ -40,11 +40,18 @@ function formatThermalTextWithDiscount(saleData, company, discountInfo) {
   const orderNo = saleData.orderNo || saleData.id || saleData.saleId || "";
   const items = saleData.items || saleData.cartItems || [];
 
+  const rawPayMode = String(saleData.payMode || saleData.paymentMode || saleData.PaymentMode || "CASH").toUpperCase().trim();
+  const isYeahPay = rawPayMode.includes("YEAH") || rawPayMode.includes("YEA");
+  const headerTitle = isYeahPay ? "PAYMENT RECEIPT" : "CHECKOUT BILL";
+
   // ── Header ────────────────────────────────────────────────────────────────
   let text = "[C]================================================\n";
-  text += "[C]<B>PAYMENT RECEIPT</B>\n";
+  text += `[C]<B>${headerTitle}</B>\n`;
+  if (!isYeahPay) {
+    text += "[C]PAYMENT PENDING PLEASE PAY AT THE COUNTER\n";
+  }
   text += "[C]================================================\n";
-  text += `[C]<B>${name}</B>\n`;
+  text += `[C]<font size='big'><B>${name}</B></font>\n`;
   if (address) text += `[C]${address}\n`;
   if (tel) text += `[C]Tel: ${tel}\n`;
   if (email) text += `[C]Email: ${email}\n`;
@@ -146,9 +153,8 @@ function formatThermalTextWithDiscount(saleData, company, discountInfo) {
   text += "[L]" + payMode + totalStr2.padStart(40 - payMode.length) + "\n";
   text += "[L]------------------------------------------------\n";
 
-  // ── Big Total ─────────────────────────────────────────────────────────────
-  text += `[C]<B>TOTAL: ${symbol}${total.toFixed(2)}</B>\n`;
-
+  // ── Big Total & Payment Status ──────────────────────────────────────────────
+  text += `[R]<font size='big'><B>TOTAL: ${symbol}${total.toFixed(2)}</B></font>\n`;
   text += "[C]================================================\n";
   text += "[C]<B>THANK YOU! COME AGAIN!</B>\n";
   text += "[C]SMART-POS BY UNIPROSG\n";
