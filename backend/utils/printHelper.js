@@ -48,7 +48,7 @@ function formatThermalTextWithDiscount(saleData, company, discountInfo) {
   let text = "[C]================================================\n";
   text += `[C]<font size='big'><B>${headerTitle}</B></font>\n`;
   if (!isYeahPay) {
-    text += "[C]PAYMENT PENDING PLEASE PAY AT THE COUNTER\n";
+    text += "[C]PAYMENT PENDING PLEASE PAY AT COUNTER\n";
   }
   text += "[C]================================================\n";
   text += `[C]<font size='big'><B>${name}</B></font>\n`;
