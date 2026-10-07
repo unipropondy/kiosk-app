@@ -1244,6 +1244,28 @@ function App() {
         return;
       }
 
+      // ✅ Trigger Customer Print Flow (matching payment_success.tsx in POS app)
+      try {
+        const saleData = {
+          invoiceNumber: data.orderId || posOrderId,
+          orderNo: data.orderId || posOrderId,
+          tableNo: tableNo || "TAKEAWAY",
+          total: parseFloat(amount) || 0,
+          paymentMethod: "ONLINE",
+          items: (cart || []).map(i => ({
+            name: i.name || i.Name || i.DishName || "Item",
+            qty: i.qty || i.Quantity || 1,
+            price: Number(i.price || i.Price || 0),
+            modifiers: i.selectedMods || i.modifiers || [],
+            comboSelections: i.comboSelections || []
+          })),
+          date: new Date()
+        };
+        UniversalPrinter.smartPrint(saleData, "1");
+      } catch (printErr) {
+        console.warn("Client-side customer receipt print error:", printErr);
+      }
+
       setCart([]);
       setPaymentDone(true);
       handlePaymentSuccess(`Payment Successful! Amount: S$${amount}`);
@@ -3038,11 +3060,12 @@ function App() {
 
                     {/* Card 3: Cash */}
                     <div className="payment-mode-card paynow-card" style={{ borderColor: '#16a34a', background: '#f0fdf4' }} onClick={async () => {
+                      const finalOrderId = currentOrderIdRef.current || currentOrderId;
                       try {
                         await fetch(`${API}/order/mark-sent`, {
                           method: "POST",
                           headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ orderId: currentOrderId })
+                          body: JSON.stringify({ orderId: finalOrderId })
                         });
 
                         await fetch(`${API}/order/payment-status`, {
@@ -3061,7 +3084,6 @@ function App() {
                       }
                       setShowPaymentPopup(false);
 
-                      const finalOrderId = currentOrderIdRef.current || currentOrderId;
                       const isKioskPayment = isKiosk || Boolean(localStorage.getItem("kioskOrderType"));
                       if (isKioskPayment) {
                         showKioskThankYouThen(

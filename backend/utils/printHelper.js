@@ -297,28 +297,38 @@ async function generateAndQueueKOTs(orderId) {
     const pool = await poolPromise;
 
     // 1. Load Order Header
-    const orderRes = await pool.request()
+    let orderRes = await pool.request()
       .input("orderNo", sql.NVarChar(50), orderId)
       .query(`
         SELECT TOP 1 h.OrderId, h.OrderNumber, LTRIM(RTRIM(h.Tableno)) as tableNo, h.CreatedBy
         FROM RestaurantOrderCur h
-        WHERE h.OrderNumber = @orderNo
+        WHERE (h.OrderNumber = @orderNo OR CAST(h.OrderId AS NVARCHAR(50)) = @orderNo)
       `);
 
     if (orderRes.recordset.length === 0) {
-      console.log(`[generateAndQueueKOTs] EARLY EXIT: Order '${orderId}' not found in RestaurantOrderCur.`);
+      orderRes = await pool.request()
+        .input("orderNo", sql.NVarChar(50), orderId)
+        .query(`
+          SELECT TOP 1 s.SettlementID as OrderId, s.BillNo as OrderNumber, LTRIM(RTRIM(s.TableNo)) as tableNo, s.CreatedBy
+          FROM SettlementHeader s
+          WHERE s.BillNo = @orderNo OR CAST(s.SettlementID AS NVARCHAR(50)) = @orderNo
+        `);
+    }
+
+    if (orderRes.recordset.length === 0) {
+      console.log(`[generateAndQueueKOTs] EARLY EXIT: Order '${orderId}' not found.`);
       return;
     }
     const orderHeader = orderRes.recordset[0];
     console.log(`[generateAndQueueKOTs] Order found: ${orderHeader.OrderNumber} (TableNo: ${orderHeader.tableNo})`);
 
     // 2. Load Items & Resolve Printer from PrintMaster
-    const itemsRes = await pool.request()
+    let itemsRes = await pool.request()
       .input("orderNo", sql.NVarChar(50), orderId)
       .query(`
         SELECT 
           d.OrderDetailId as lineItemId, d.DishId as id, d.Quantity as qty, 
-          dish.Name as name, d.Remarks as note, d.ModifiersJSON, d.isTakeAway,
+          ISNULL(dish.Name, d.DishName) as name, d.Remarks as note, d.ModifiersJSON, d.isTakeAway,
           d.ComboDetailsJSON,
           ISNULL(ckt.KitchenTypeName, cat.CategoryName) as KitchenTypeName,
           pm.PrinterName,
@@ -331,13 +341,37 @@ async function generateAndQueueKOTs(orderId) {
         LEFT JOIN CategoryMaster cat ON dgm.CategoryId = cat.CategoryId
         LEFT JOIN CategoryKitchenType ckt ON dgm.CategoryId = ckt.CategoryId
         LEFT JOIN PrintMaster pm ON CAST(ckt.KitchenTypeCode AS VARCHAR(50)) = CAST(pm.KitchenTypeValue AS VARCHAR(50)) AND pm.PrinterType = 2 AND pm.IsActive = 1
-        WHERE h.OrderNumber = @orderNo
-        AND d.StatusCode IN (1, 2)
+        WHERE (h.OrderNumber = @orderNo OR CAST(h.OrderId AS NVARCHAR(50)) = @orderNo)
+        AND d.StatusCode IN (1, 2, 3)
       `);
 
-    const items = itemsRes.recordset;
+    let items = itemsRes.recordset;
     if (items.length === 0) {
-      console.log(`[generateAndQueueKOTs] EARLY EXIT: No active items (StatusCode 1 or 2) for order '${orderId}'.`);
+      itemsRes = await pool.request()
+        .input("orderNo", sql.NVarChar(50), orderId)
+        .query(`
+          SELECT 
+            d.SettlementItemDetailID as lineItemId, d.DishId as id, d.Qty as qty, 
+            ISNULL(dish.Name, d.DishName) as name, NULL as note, NULL as ModifiersJSON, 0 as isTakeAway,
+            NULL as ComboDetailsJSON,
+            cat.CategoryName as KitchenTypeName,
+            pm.PrinterName,
+            ISNULL(NULLIF(LTRIM(RTRIM(pm.PrinterIP)), ''), LTRIM(RTRIM(pm.PrinterPath))) as PrinterIP,
+            pm.IsActive as IsPrinterEnabled
+          FROM SettlementItemDetail d 
+          JOIN SettlementHeader s ON d.SettlementID = s.SettlementID 
+          LEFT JOIN DishMaster dish ON d.DishId = dish.DishId
+          LEFT JOIN DishGroupMaster dgm ON dish.DishGroupId = dgm.DishGroupId
+          LEFT JOIN CategoryMaster cat ON dgm.CategoryId = cat.CategoryId
+          LEFT JOIN CategoryKitchenType ckt ON dgm.CategoryId = ckt.CategoryId
+          LEFT JOIN PrintMaster pm ON CAST(ckt.KitchenTypeCode AS VARCHAR(50)) = CAST(pm.KitchenTypeValue AS VARCHAR(50)) AND pm.PrinterType = 2 AND pm.IsActive = 1
+          WHERE s.BillNo = @orderNo
+        `);
+      items = itemsRes.recordset;
+    }
+
+    if (items.length === 0) {
+      console.log(`[generateAndQueueKOTs] EARLY EXIT: No active items for order '${orderId}'.`);
       return;
     }
 
@@ -514,34 +548,68 @@ async function generateAndQueueReceipt(orderId, paymentMode = 'ONLINE') {
   try {
     const pool = await poolPromise;
 
-    // 1. Get Order Header + Totals
-    const orderHeaderRes = await pool.request()
+    // 1. Get Order Header + Totals (Primary: RestaurantOrderCur, Fallback: SettlementHeader / RestaurantOrder)
+    let orderHeaderRes = await pool.request()
       .input("orderNo", sql.NVarChar(50), orderId)
       .query(`
         SELECT TOP 1 h.OrderId, h.OrderNumber, LTRIM(RTRIM(h.Tableno)) as tableNo, 
                h.TotalAmount, h.ServiceCharge as ServiceChargeAmount, h.TotalTax as GstAmount, 
                h.DiscountAmount, h.DiscountPercentage as DiscountValue
         FROM RestaurantOrderCur h
-        WHERE h.OrderNumber = @orderNo
+        WHERE (h.OrderNumber = @orderNo OR CAST(h.OrderId AS NVARCHAR(50)) = @orderNo)
       `);
+
+    if (orderHeaderRes.recordset.length === 0) {
+      orderHeaderRes = await pool.request()
+        .input("orderNo", sql.NVarChar(50), orderId)
+        .query(`
+          SELECT TOP 1 s.SettlementID as OrderId, s.BillNo as OrderNumber, LTRIM(RTRIM(s.TableNo)) as tableNo, 
+                 s.SysAmount as TotalAmount, 0 as ServiceChargeAmount, 0 as GstAmount, 
+                 ISNULL(s.DiscountAmount, 0) as DiscountAmount, 0 as DiscountValue
+          FROM SettlementHeader s
+          WHERE (s.BillNo = @orderNo OR CAST(s.SettlementID AS NVARCHAR(50)) = @orderNo)
+        `);
+    }
 
     if (orderHeaderRes.recordset.length === 0) return;
     const orderHeader = orderHeaderRes.recordset[0];
 
-    // 2. Get Items
-    const itemsRes = await pool.request()
+    // 2. Get Items (Primary: RestaurantOrderDetailCur, Fallback: SettlementItemDetail)
+    let itemsRes = await pool.request()
       .input("orderNo", sql.NVarChar(50), orderId)
       .query(`
-        SELECT d.Quantity as qty, dish.Name as name, d.PricePerUnit as price, d.ModifiersJSON, d.isTakeAway, d.ComboDetailsJSON
+        SELECT d.Quantity as qty, ISNULL(dish.Name, d.DishName) as name, d.PricePerUnit as price, d.ModifiersJSON, d.isTakeAway, d.ComboDetailsJSON
         FROM RestaurantOrderDetailCur d 
         JOIN RestaurantOrderCur h ON d.OrderId = h.OrderId 
         LEFT JOIN DishMaster dish ON d.DishId = dish.DishId
-        WHERE h.OrderNumber = @orderNo AND d.StatusCode NOT IN (0)
+        WHERE (h.OrderNumber = @orderNo OR CAST(h.OrderId AS NVARCHAR(50)) = @orderNo) AND d.StatusCode NOT IN (0)
       `);
-    const items = itemsRes.recordset.map(item => ({
+
+    let items = itemsRes.recordset.map(item => ({
       ...item,
       modifiers: item.ModifiersJSON ? JSON.parse(item.ModifiersJSON) : []
     }));
+
+    if (items.length === 0) {
+      itemsRes = await pool.request()
+        .input("orderNo", sql.NVarChar(50), orderId)
+        .query(`
+          SELECT d.Qty as qty, ISNULL(dish.Name, d.DishName) as name, d.Price as price, NULL as ModifiersJSON, 0 as isTakeAway, NULL as ComboDetailsJSON
+          FROM SettlementItemDetail d 
+          JOIN SettlementHeader s ON d.SettlementID = s.SettlementID 
+          LEFT JOIN DishMaster dish ON d.DishId = dish.DishId
+          WHERE s.BillNo = @orderNo
+        `);
+      items = itemsRes.recordset.map(item => ({
+        ...item,
+        modifiers: []
+      }));
+    }
+
+    if (items.length === 0) {
+      console.warn(`[generateAndQueueReceipt] No items found for receipt order '${orderId}'`);
+      return;
+    }
 
     // 3. Get Company details from CompanySettings
     const companyRes = await pool.request().query("SELECT TOP 1 CompanyName, Address, Phone, Email, GSTNo, CurrencySymbol FROM CompanySettings");
@@ -557,8 +625,8 @@ async function generateAndQueueReceipt(orderId, paymentMode = 'ONLINE') {
     };
 
     // 4. Determine Printer Type
-    const isTakeaway = String(orderHeader.tableNo).toUpperCase().startsWith('TW') ||
-      String(orderHeader.tableNo).toUpperCase() === 'TAKEAWAY';
+    const isTakeaway = String(orderHeader.tableNo || "").toUpperCase().startsWith('TW') ||
+      String(orderHeader.tableNo || "").toUpperCase() === 'TAKEAWAY';
     const pType = isTakeaway ? 3 : 1;
 
     // 5. Fetch Printer IP dynamically from PrintMaster
@@ -608,17 +676,20 @@ async function generateAndQueueReceipt(orderId, paymentMode = 'ONLINE') {
       return;
     }
 
-    // 6. Format Thermal Text
+    // 6. Calculate Subtotal and Format Thermal Text
+    const calculatedSubtotal = items.reduce((s, i) => s + Number(i.price || 0) * Number(i.qty || 1), 0);
+    const displayTotal = Number(orderHeader.TotalAmount) > 0 ? Number(orderHeader.TotalAmount) : calculatedSubtotal;
+
     const saleData = {
       tableNo: orderHeader.tableNo,
       orderNo: orderHeader.OrderNumber,
       items: items,
-      subtotal: (orderHeader.TotalAmount || 0) - (orderHeader.ServiceChargeAmount || 0) - (orderHeader.GstAmount || 0) + (orderHeader.DiscountAmount || 0),
-      serviceCharge: orderHeader.ServiceChargeAmount || 0,
-      gst: orderHeader.GstAmount || 0,
-      total: orderHeader.TotalAmount || 0,
+      subtotal: calculatedSubtotal,
+      serviceCharge: Number(orderHeader.ServiceChargeAmount) || 0,
+      gst: Number(orderHeader.GstAmount) || 0,
+      total: displayTotal,
       payMode: paymentMode,
-      paidAmount: orderHeader.TotalAmount || 0
+      paidAmount: displayTotal
     };
 
     const discountInfo = {
@@ -630,23 +701,7 @@ async function generateAndQueueReceipt(orderId, paymentMode = 'ONLINE') {
 
     const thermalText = formatThermalTextWithDiscount(saleData, company, discountInfo);
 
-    // Duplicate Check
-    const dupCheck = await pool.request()
-      .input('PrinterIp', sql.NVarChar(100), printerIp)
-      .input('SearchText', sql.NVarChar(100), `%Bill No:%${String(orderHeader.OrderNumber).slice(-4)}%`)
-      .query(`
-        SELECT TOP 1 JobId 
-        FROM PrintJobQueue 
-        WHERE PrinterIp = @PrinterIp 
-          AND Status IN ('PENDING', 'PROCESSING') 
-          AND Content LIKE @SearchText
-      `);
-
-    if (dupCheck.recordset.length > 0) {
-      console.log(`[generateAndQueueReceipt] Skip: Duplicate receipt for Order ${orderHeader.OrderNumber}`);
-      return;
-    }
-
+    // 7. Insert Print Job Queue
     const jobId = crypto.randomUUID();
     const storeId = "STORE_001";
 

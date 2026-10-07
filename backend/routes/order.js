@@ -2034,6 +2034,9 @@ router.post("/complete-online-payment", async (req, res) => {
     try {
       // Queue KOT print for kitchen
       await generateAndQueueKOTs(orderId);
+      if (guidOrderId && guidOrderId !== orderId) {
+        await generateAndQueueKOTs(guidOrderId).catch(() => {});
+      }
     } catch (err) {
       console.error("Failed to queue KOT for online payment:", err);
     }
@@ -2041,18 +2044,23 @@ router.post("/complete-online-payment", async (req, res) => {
     try {
       // Queue checkout receipt for online payments
       await generateAndQueueReceipt(orderId, pMethod);
+      if (guidOrderId && guidOrderId !== orderId) {
+        await generateAndQueueReceipt(guidOrderId, pMethod).catch(() => {});
+      }
     } catch (err) {
       console.error("Failed to queue receipt:", err);
     }
 
-    if (req.io) {
-      req.io.emit("qr-print-request", {
+    const io = req.io || req.app?.get("io");
+    if (io) {
+      io.emit("qr-print-request", {
         orderId: orderId,
         source: "QR",
         paymentType: "online",
         printKOT: true,
         printBill: true
       });
+      io.emit("kot_printed", { tableId: cleanTableId, orderId: orderId });
     }
 
     res.json({
