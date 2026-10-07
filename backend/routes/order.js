@@ -1746,7 +1746,8 @@ router.post("/complete-online-payment", async (req, res) => {
     const subTotal = dbItems.reduce((sum, i) => sum + (i.TotalDetailLineAmount || 0), 0);
     console.log(`🔍 [PAYMENT] Found ${dbItems.length} items, SubTotal: ${subTotal}`);
 
-    const isYeahPay = pMethod.includes("YEAH") || pMethod.includes("YEA");
+    const extraCharge = parseFloat(req.body.extraCharge) || 0;
+    const isYeahPay = pMethod.includes("YEAH") || pMethod.includes("YEA") || req.body.isPaid === true;
 
     // ── STEP 4: UPSERT SETTLEMENT HEADER (ONLY FOR YEAPAY / ONLINE PAID ORDERS) ─────
     if (isYeahPay) {
@@ -1773,12 +1774,14 @@ router.post("/complete-online-payment", async (req, res) => {
           .input("sysAmount", sql.Money, amount)
           .input("mobile", sql.NVarChar(50), header?.MobileNo || null)
           .input("payMode", sql.NVarChar(50), pMethod)
+          .input("extraCharge", sql.Numeric(18, 2), extraCharge)
           .input("userId", sql.UniqueIdentifier, DEFAULT_GUID)
           .query(`
                     UPDATE SettlementHeader
                     SET LastSettlementDate = GETDATE(), TableNo = @tableNo, Section = @section,
                         BusinessUnitId = @bizId, SysAmount = @sysAmount, ManualAmount = @sysAmount,
-                        SubTotal = @subTotal, MobileNo = @mobile, PayMode = @payMode
+                        SubTotal = @subTotal, MobileNo = @mobile, PayMode = @payMode,
+                        PaymodeServiceCharge = @extraCharge
                     WHERE SettlementID = @sid
                 `);
         console.log(`✅ [PAYMENT] SettlementHeader updated: ${settlementId}`);
@@ -1793,19 +1796,21 @@ router.post("/complete-online-payment", async (req, res) => {
           .input("sysAmount", sql.Money, amount)
           .input("mobile", sql.NVarChar(50), header?.MobileNo || null)
           .input("payMode", sql.NVarChar(50), pMethod)
+          .input("extraCharge", sql.Numeric(18, 2), extraCharge)
           .input("userId", sql.UniqueIdentifier, DEFAULT_GUID)
           .query(`
                     INSERT INTO SettlementHeader (
                         SettlementID, LastSettlementDate, BillNo, OrderType, TableNo, Section,
                         BusinessUnitId, SysAmount, ManualAmount, CreatedOn,
                         SubTotal, TotalTax, DiscountAmount, MobileNo, IsCancelled,
-                        CreatedBy, start_date
+                        CreatedBy, start_date, PaymodeServiceCharge
                     ) VALUES (
                         @sid, GETDATE(), @oid, 'DINE-IN', @tableNo, @section,
                         @bizId, @sysAmount, @sysAmount, GETDATE(),
                         @subTotal, 0, 0, @mobile, 0,
                         @userId,
-                        (SELECT TOP 1 StartDate FROM DateEntry ORDER BY CreatedDate DESC)
+                        (SELECT TOP 1 StartDate FROM DateEntry ORDER BY CreatedDate DESC),
+                        @extraCharge
                     )
                 `);
         console.log(`✅ [PAYMENT] SettlementHeader inserted: ${settlementId}`);
@@ -1873,10 +1878,10 @@ router.post("/complete-online-payment", async (req, res) => {
       console.log(`✅ [PAYMENT] ${dbItems.length} SettlementItemDetail(s) inserted`);
     }
 
-    // ── STEP 6: UPSERT PAYMENT DETAIL (ONLY FOR YEAPAY / ONLINE PAID ORDERS) ─────
+    // ── STEP 6: UPSERT PAYMENT DETAIL ─────────────────────────────────────────
     if (isYeahPay) {
       const paymodeRes = await transaction.request()
-        .input("payMode", sql.NVarChar(50), 'Online')
+        .input("payMode", sql.NVarChar(50), pMethod)
         .query(`SELECT TOP 1 Position FROM Paymode WHERE UPPER(LTRIM(RTRIM(PayMode))) = UPPER(LTRIM(RTRIM(@payMode)))`);
       const paymodePosition = paymodeRes.recordset[0]?.Position || 3;
 
@@ -1889,10 +1894,12 @@ router.post("/complete-online-payment", async (req, res) => {
           .input("orderId", sql.UniqueIdentifier, guidOrderId)
           .input("paymode", sql.Int, paymodePosition)
           .input("amount", sql.Decimal(18, 2), amount)
+          .input("extraCharge", sql.Numeric(18, 2), extraCharge)
           .input("userId", sql.UniqueIdentifier, DEFAULT_GUID)
           .query(`
                     UPDATE PaymentDetailCur
-                    SET PaymentCollectedOn = GETDATE(), Paymode = @paymode, Amount = @amount, ModifiedBy = @userId, ModifiedOn = GETDATE()
+                    SET PaymentCollectedOn = GETDATE(), Paymode = @paymode, Amount = @amount,
+                        PaymodeServiceChargeAmount = @extraCharge, ModifiedBy = @userId, ModifiedOn = GETDATE()
                     WHERE OrderId = @orderId
                 `);
         console.log(`✅ [PAYMENT] PaymentDetailCur updated`);
@@ -1903,17 +1910,18 @@ router.post("/complete-online-payment", async (req, res) => {
           .input("orderId", sql.UniqueIdentifier, guidOrderId)
           .input("paymode", sql.Int, paymodePosition)
           .input("amount", sql.Decimal(18, 2), amount)
+          .input("extraCharge", sql.Numeric(18, 2), extraCharge)
           .input("bizId", sql.UniqueIdentifier, businessUnitId)
           .input("userId", sql.UniqueIdentifier, DEFAULT_GUID)
           .query(`
                     INSERT INTO PaymentDetailCur (
                         PaymentId, RestaurantBillId, OrderId, BilledFor, 
                         PaymentCollectedOn, PaymentType, Paymode, Amount,
-                        BusinessUnitId, CreatedBy, CreatedOn, ModifiedBy, ModifiedOn
+                        PaymodeServiceChargeAmount, BusinessUnitId, CreatedBy, CreatedOn, ModifiedBy, ModifiedOn
                     ) VALUES (
                         @paymentId, @restaurantBillId, @orderId, 1,
                         GETDATE(), 1, @paymode, @amount,
-                        @bizId, @userId, GETDATE(), @userId, GETDATE()
+                        @extraCharge, @bizId, @userId, GETDATE(), @userId, GETDATE()
                     ) 
                 `);
         console.log(`✅ [PAYMENT] PaymentDetailCur inserted`);
@@ -1946,10 +1954,10 @@ router.post("/complete-online-payment", async (req, res) => {
                 UPDATE RestaurantOrderCur SET TotalAmount = @totalAmt, ModifiedOn = GETDATE() 
                 WHERE OrderNumber = @orderNo;
 
-                -- Archive to RestaurantOrder (if not exists)
+                ${isYeahPay ? `
+                -- Archive to RestaurantOrder (only for paid digital orders)
                 IF NOT EXISTS (SELECT 1 FROM RestaurantOrder WHERE OrderNumber = @orderNo)
                 BEGIN
-                    -- ✅ Check if TotalAmount column exists in RestaurantOrder
                     IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('RestaurantOrder') AND name = 'TotalAmount')
                     BEGIN
                         INSERT INTO RestaurantOrder (
@@ -1973,6 +1981,7 @@ router.post("/complete-online-payment", async (req, res) => {
                         FROM RestaurantOrderCur WHERE OrderNumber = @orderNo;
                     END
                 END
+                ` : ''}
 
                 -- Archive details (only rows not already archived)
                 INSERT INTO RestaurantOrderDetail (
@@ -2002,7 +2011,7 @@ router.post("/complete-online-payment", async (req, res) => {
 
     try {
       // ✅ Queue receipt once using OrderNumber only
-      await generateAndQueueReceipt(orderId, pMethod);
+      await generateAndQueueReceipt(orderId, pMethod, extraCharge);
     } catch (err) {
       console.error("Failed to queue receipt:", err);
     }

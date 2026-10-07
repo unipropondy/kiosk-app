@@ -137,6 +137,9 @@ function App() {
   const [showPayNowModal, setShowPayNowModal] = useState(false);
   const [showUpiModal, setShowUpiModal] = useState(false);
   const [showYeahPayModal, setShowYeahPayModal] = useState(false);
+  const [paymodesList, setPaymodesList] = useState([]);
+  const [showExtraChargeModal, setShowExtraChargeModal] = useState(false);
+  const [pendingPaymentAction, setPendingPaymentAction] = useState(null);
   const [yeahPayStatus, setYeahPayStatus] = useState("INIT"); // INIT, PROCESSING, SUCCESS, FAILED
   const [yeahPayMsg, setYeahPayMsg] = useState("");
   const [yeahPayDetails, setYeahPayDetails] = useState(null);
@@ -190,11 +193,14 @@ function App() {
     setTempThemeColor(themeColor);
   }, [themeColor]);
 
-  const handlePaymentSuccess = (msg) => {
+  const [successTitle, setSuccessTitle] = useState("Success!");
+
+  const handlePaymentSuccess = (msg, title = "Success!") => {
     setCart((prev) => prev.map((item) => ({ ...item, status: "SENT" })));
     setShowPaymentPopup(false);
+    setSuccessTitle(title);
     setSuccessMessage(msg);
-    setTimeout(() => setSuccessMessage(""), 3000);
+    setTimeout(() => setSuccessMessage(""), 3500);
   };
 
 
@@ -227,6 +233,19 @@ function App() {
       }
     };
     fetchQRs();
+
+    const fetchPaymodesList = async () => {
+      try {
+        const res = await fetch(`${API}/paymodes/list`);
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setPaymodesList(data);
+        }
+      } catch (err) {
+        console.log("FETCH PAYMODES LIST ERROR:", err);
+      }
+    };
+    fetchPaymodesList();
 
     const loadAppSettings = async () => {
       try {
@@ -1215,9 +1234,43 @@ function App() {
   //     }
   // };
 
-  const completeOrder = async (posOrderId, amount, payMethod = "ONLINE") => {
+  const getExtraChargeForPaymode = (modeName) => {
+    const match = paymodesList.find(
+      (p) => p.PayMode?.toUpperCase().trim() === modeName?.toUpperCase().trim()
+    );
+    return match ? Number(match.ExtraCharges || 0) : 0;
+  };
+
+  const handlePaymodeClick = (method) => {
+    const extra = getExtraChargeForPaymode(method);
+    if (extra > 0) {
+      setPendingPaymentAction({ method, extraCharge: extra });
+      setShowExtraChargeModal(true);
+    } else {
+      executePaymentWithExtraCharge(method, 0);
+    }
+  };
+
+  const executePaymentWithExtraCharge = (method, extraCharge) => {
+    const finalOrderId = currentOrderIdRef.current || currentOrderId || localStorage.getItem("kioskOrderId");
+    const baseAmt = Number(totalAmount) > 0 ? Number(totalAmount) : Number(yeahPayPayableAmount || 0);
+    const finalPayable = (baseAmt + Number(extraCharge)).toFixed(2);
+
+    if (method === "CARD" || method === "PAYNOW") {
+      setYeahPayPayableAmount(finalPayable);
+      handleYeahPayPayment(method, extraCharge);
+    } else if (method === "CASH") {
+      setShowPaymentPopup(false);
+      completeOrder(finalOrderId, finalPayable, "CASH", extraCharge);
+    } else {
+      setShowPaymentPopup(false);
+      completeOrder(finalOrderId, finalPayable, method, extraCharge);
+    }
+  };
+
+  const completeOrder = async (posOrderId, amount, payMethod = "ONLINE", extraCharge = 0) => {
     try {
-      console.log("[completeOrder] Using POS orderId:", posOrderId, "Amount:", amount, "PayMethod:", payMethod);
+      console.log("[completeOrder] Using POS orderId:", posOrderId, "Amount:", amount, "PayMethod:", payMethod, "ExtraCharge:", extraCharge);
       const promoAmount = Number(localStorage.getItem("promoAmount") || 0);
       const res = await fetch(`${API}/order/complete-online-payment`, {
         method: "POST",
@@ -1231,6 +1284,7 @@ function App() {
           kioskCustomerName: isKiosk ? (localStorage.getItem("kioskCustomerName") || undefined) : undefined,
           totalAmount: parseFloat(amount),
           paymentMethod: payMethod,
+          extraCharge: parseFloat(extraCharge || 0),
           promoAmount,
           cart: cart
         })
@@ -1250,7 +1304,13 @@ function App() {
 
       setCart([]);
       setPaymentDone(true);
-      handlePaymentSuccess(`Payment Successful! Amount: S$${amount}`);
+
+      const isDigitalPaid = payMethod?.toUpperCase().includes("YEAH") || payMethod?.toUpperCase().includes("YEA");
+      if (isDigitalPaid) {
+        handlePaymentSuccess(`Payment Successful! Amount: S$${amount}`, "Success!");
+      } else {
+        handlePaymentSuccess(`Order Sent to Counter! Please pay S$${amount} at Counter.`, "Order Sent!");
+      }
 
       // For kiosk: clear the session after payment
       if (isKiosk) {
@@ -3034,52 +3094,210 @@ function App() {
 
                   <div className="payment-options-row">
                     {/* Card 1: YeahPay Cloud POS - Card */}
-                    <div className="payment-mode-card paynow-card" style={{ borderColor: '#3b82f6', background: '#eff6ff' }} onClick={() => {
-                      handleYeahPayPayment("CARD");
+                    <div className="payment-mode-card paynow-card" style={{ borderColor: '#3b82f6', background: '#eff6ff', position: 'relative' }} onClick={() => {
+                      handlePaymodeClick("CARD");
                     }}>
+                      {getExtraChargeForPaymode("CARD") > 0 && (
+                        <div style={{ position: 'absolute', top: '10px', right: '10px', background: '#d97706', color: 'white', padding: '2px 8px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold' }}>
+                          +${getExtraChargeForPaymode("CARD").toFixed(2)}
+                        </div>
+                      )}
                       <div className="payment-mode-icons" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '110px' }}>
                         <CardIcon />
                       </div>
                       <div className="payment-mode-label" style={{ color: '#1d4ed8', fontSize: '22px', fontWeight: 'bold', marginTop: '8px' }}>Card</div>
+                      {getExtraChargeForPaymode("CARD") > 0 && (
+                        <div style={{ fontSize: '13px', color: '#b45309', fontWeight: '600', marginTop: '2px' }}>
+                          (Extra ${getExtraChargeForPaymode("CARD").toFixed(2)} fee)
+                        </div>
+                      )}
                     </div>
 
                     {/* Card 2: YeahPay Cloud POS - PayNow */}
-                    <div className="payment-mode-card paynow-card" style={{ borderColor: '#ec4899', background: '#fdf2f8' }} onClick={() => {
-                      handleYeahPayPayment("PAYNOW");
+                    <div className="payment-mode-card paynow-card" style={{ borderColor: '#ec4899', background: '#fdf2f8', position: 'relative' }} onClick={() => {
+                      handlePaymodeClick("PAYNOW");
                     }}>
+                      {getExtraChargeForPaymode("PAYNOW") > 0 && (
+                        <div style={{ position: 'absolute', top: '10px', right: '10px', background: '#d97706', color: 'white', padding: '2px 8px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold' }}>
+                          +${getExtraChargeForPaymode("PAYNOW").toFixed(2)}
+                        </div>
+                      )}
                       <div className="payment-mode-icons" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '110px' }}>
                         <PayNowIcon />
                       </div>
                       <div className="payment-mode-label" style={{ color: '#be185d', fontSize: '22px', fontWeight: 'bold', marginTop: '8px' }}>PayNow</div>
+                      {getExtraChargeForPaymode("PAYNOW") > 0 && (
+                        <div style={{ fontSize: '13px', color: '#b45309', fontWeight: '600', marginTop: '2px' }}>
+                          (Extra ${getExtraChargeForPaymode("PAYNOW").toFixed(2)} fee)
+                        </div>
+                      )}
                     </div>
-
-                    {/* Hidden: PayNow Gateway (Online) button */}
-                    {/* 
-                    <div className="payment-mode-card paynow-card" onClick={() => {
-                      setShowPaymentPopup(false);
-                      handlePayOnline();
-                    }}>
-                      <div className="payment-mode-icons grid-icons">
-                        <MastercardBrand />
-                        <VisaBrand />
-                        <AmexBrand />
-                        <JcbBrand />
-                      </div>
-                      <div className="payment-mode-label">PayNow (Gateway)</div>
-                    </div>
-                    */}
 
                     {/* Card 3: Cash */}
-                    <div className="payment-mode-card paynow-card" style={{ borderColor: '#16a34a', background: '#f0fdf4' }} onClick={async () => {
-                      const finalOrderId = currentOrderIdRef.current || currentOrderId || localStorage.getItem("kioskOrderId");
-                      setShowPaymentPopup(false);
-                      completeOrder(finalOrderId, totalAmount, "CASH");
+                    <div className="payment-mode-card paynow-card" style={{ borderColor: '#16a34a', background: '#f0fdf4', position: 'relative' }} onClick={() => {
+                      handlePaymodeClick("CASH");
                     }}>
+                      {getExtraChargeForPaymode("CASH") > 0 && (
+                        <div style={{ position: 'absolute', top: '10px', right: '10px', background: '#d97706', color: 'white', padding: '2px 8px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold' }}>
+                          +${getExtraChargeForPaymode("CASH").toFixed(2)}
+                        </div>
+                      )}
                       <div className="payment-mode-icons" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '110px' }}>
                         <CashBrand />
                       </div>
                       <div className="payment-mode-label" style={{ color: '#15803d', fontSize: '22px', fontWeight: 'bold', marginTop: '8px' }}>Cash</div>
+                      {getExtraChargeForPaymode("CASH") > 0 && (
+                        <div style={{ fontSize: '13px', color: '#b45309', fontWeight: '600', marginTop: '2px' }}>
+                          (Extra ${getExtraChargeForPaymode("CASH").toFixed(2)} fee)
+                        </div>
+                      )}
                     </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* EXTRA CHARGE CONFIRMATION MODAL WITH 'X' BUTTON */}
+            {showExtraChargeModal && pendingPaymentAction && (
+              <div className="modal-overlay" style={{ zIndex: 10005 }}>
+                <div style={{
+                  background: "white",
+                  borderRadius: "24px",
+                  padding: "28px",
+                  maxWidth: "440px",
+                  width: "90%",
+                  textAlign: "center",
+                  boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: "18px",
+                  position: "relative",
+                  animation: "fadeIn 0.25s ease"
+                }}>
+                  {/* Top Right 'X' Close Button */}
+                  <button
+                    onClick={() => {
+                      setShowExtraChargeModal(false);
+                      setPendingPaymentAction(null);
+                    }}
+                    style={{
+                      position: "absolute",
+                      top: "16px",
+                      right: "16px",
+                      background: "#f1f5f9",
+                      border: "none",
+                      borderRadius: "50%",
+                      width: "36px",
+                      height: "36px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: "pointer",
+                      color: "#64748b",
+                      transition: "all 0.2s ease"
+                    }}
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18"></line>
+                      <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                  </button>
+
+                  {/* Header Icon */}
+                  <div style={{
+                    width: "60px",
+                    height: "60px",
+                    borderRadius: "50%",
+                    background: "#fef3c7",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "28px"
+                  }}>
+                    ⚡
+                  </div>
+
+                  <div>
+                    <h2 style={{ margin: "0 0 6px 0", fontSize: "22px", color: "#0f172a", fontWeight: "800" }}>
+                      Extra Charge Notice
+                    </h2>
+                    <p style={{ margin: 0, fontSize: "14px", color: "#64748b" }}>
+                      Choosing <strong>{pendingPaymentAction.method}</strong> incurs an extra fee
+                    </p>
+                  </div>
+
+                  {/* Breakdown Box */}
+                  <div style={{
+                    background: "#f8fafc",
+                    borderRadius: "16px",
+                    padding: "16px 20px",
+                    width: "100%",
+                    border: "1px solid #e2e8f0",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "10px"
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "14px", color: "#475569" }}>
+                      <span>Order Subtotal:</span>
+                      <span style={{ fontWeight: "700" }}>${Number(totalAmount).toFixed(2)}</span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "14px", color: "#d97706" }}>
+                      <span>Extra Charge ({pendingPaymentAction.method}):</span>
+                      <span style={{ fontWeight: "700" }}>+${Number(pendingPaymentAction.extraCharge).toFixed(2)}</span>
+                    </div>
+                    <div style={{ height: "1px", background: "#cbd5e1", margin: "4px 0" }}></div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "18px", color: "#0f172a", fontWeight: "800" }}>
+                      <span>Total Payable:</span>
+                      <span style={{ color: "#16a34a" }}>
+                        ${(Number(totalAmount) + Number(pendingPaymentAction.extraCharge)).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div style={{ display: "flex", gap: "12px", width: "100%", marginTop: "8px" }}>
+                    <button
+                      onClick={() => {
+                        setShowExtraChargeModal(false);
+                        setPendingPaymentAction(null);
+                      }}
+                      style={{
+                        flex: 1,
+                        padding: "14px",
+                        borderRadius: "12px",
+                        border: "1px solid #cbd5e1",
+                        background: "#f8fafc",
+                        color: "#475569",
+                        fontWeight: "600",
+                        fontSize: "15px",
+                        cursor: "pointer"
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => {
+                        const action = pendingPaymentAction;
+                        setShowExtraChargeModal(false);
+                        setPendingPaymentAction(null);
+                        executePaymentWithExtraCharge(action.method, action.extraCharge);
+                      }}
+                      style={{
+                        flex: 1.4,
+                        padding: "14px",
+                        borderRadius: "12px",
+                        border: "none",
+                        background: "#16a34a",
+                        color: "white",
+                        fontWeight: "700",
+                        fontSize: "15px",
+                        cursor: "pointer",
+                        boxShadow: "0 4px 12px rgba(22,163,74,0.3)"
+                      }}
+                    >
+                      Confirm & Pay (${(Number(totalAmount) + Number(pendingPaymentAction.extraCharge)).toFixed(2)})
+                    </button>
                   </div>
                 </div>
               </div>
@@ -3187,10 +3405,19 @@ function App() {
             {successMessage && (
               <div className="modal-overlay" style={{ zIndex: 10000 }}>
                 <div className="success-modal">
-                  <div className="success-icon">
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                  <div className="success-icon" style={{ background: successTitle === "Order Sent!" ? "#f97316" : "#22c55e" }}>
+                    {successTitle === "Order Sent!" ? (
+                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                      </svg>
+                    ) : (
+                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                      </svg>
+                    )}
                   </div>
-                  <h2 className="success-title">Success!</h2>
+                  <h2 className="success-title">{successTitle || "Success!"}</h2>
                   <p className="success-text">{successMessage}</p>
                 </div>
               </div>

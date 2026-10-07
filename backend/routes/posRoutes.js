@@ -503,6 +503,27 @@ router.post("/clear-cache", (req, res) => {
 
 
 /* ================= PAYMODES ================= */
+router.get("/paymodes/list", async (req, res) => {
+  try {
+    const pool = await poolPromise;
+    const result = await pool.request().query(`
+      SELECT 
+        LTRIM(RTRIM(PayMode)) AS PayMode,
+        Position,
+        Description,
+        ISNULL(ExtraCharges, 0) AS ExtraCharges,
+        ISNULL(YeahPayEnabled, 0) AS YeahPayEnabled
+      FROM PAYMODE
+      WHERE Active = 1 OR Active IS NULL
+      ORDER BY Position ASC, PayMode ASC
+    `);
+    res.json(result.recordset);
+  } catch (err) {
+    console.error("GET PAYMODES LIST ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.get("/paymodes/qrs", async (req, res) => {
   try {
     const pool = await poolPromise;

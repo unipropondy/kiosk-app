@@ -139,6 +139,12 @@ function formatThermalTextWithDiscount(saleData, company, discountInfo) {
     text += totalLine("Service Charge:", serviceCharge);
   }
 
+  const extraCharge = Number(saleData.extraCharge || saleData.PaymodeServiceCharge || 0);
+  if (extraCharge > 0) {
+    const chargeLabel = `Extra Charge (${(saleData.payMode || "Payment").toUpperCase().trim()}):`;
+    text += totalLine(chargeLabel, extraCharge);
+  }
+
   const gst = Number(saleData.gst || saleData.gstAmount || 0);
   if (gst > 0) {
     const gstLabel = gstNo ? `GST (${gstNo}):` : "GST (9%):";
@@ -549,7 +555,7 @@ async function generateAndQueueKOTs(orderId) {
   }
 }
 
-async function generateAndQueueReceipt(orderId, paymentMode = 'ONLINE') {
+async function generateAndQueueReceipt(orderId, paymentMode = 'ONLINE', passedExtraCharge = 0) {
   try {
     const pool = await poolPromise;
 
@@ -559,8 +565,10 @@ async function generateAndQueueReceipt(orderId, paymentMode = 'ONLINE') {
       .query(`
         SELECT TOP 1 h.OrderId, h.OrderNumber, LTRIM(RTRIM(h.Tableno)) as tableNo, 
                h.TotalAmount, h.ServiceCharge as ServiceChargeAmount, h.TotalTax as GstAmount, 
-               h.DiscountAmount, h.DiscountPercentage as DiscountValue
+               h.DiscountAmount, h.DiscountPercentage as DiscountValue,
+               sh.PaymodeServiceCharge
         FROM RestaurantOrderCur h
+        LEFT JOIN SettlementHeader sh ON h.OrderNumber = sh.BillNo
         WHERE (h.OrderNumber = @orderNo OR CAST(h.OrderId AS NVARCHAR(50)) = @orderNo)
       `);
 
@@ -570,7 +578,8 @@ async function generateAndQueueReceipt(orderId, paymentMode = 'ONLINE') {
         .query(`
           SELECT TOP 1 s.SettlementID as OrderId, s.BillNo as OrderNumber, LTRIM(RTRIM(s.TableNo)) as tableNo, 
                  s.SysAmount as TotalAmount, 0 as ServiceChargeAmount, 0 as GstAmount, 
-                 ISNULL(s.DiscountAmount, 0) as DiscountAmount, 0 as DiscountValue
+                 ISNULL(s.DiscountAmount, 0) as DiscountAmount, 0 as DiscountValue,
+                 s.PaymodeServiceCharge
           FROM SettlementHeader s
           WHERE (s.BillNo = @orderNo OR CAST(s.SettlementID AS NVARCHAR(50)) = @orderNo)
         `);
@@ -578,6 +587,19 @@ async function generateAndQueueReceipt(orderId, paymentMode = 'ONLINE') {
 
     if (orderHeaderRes.recordset.length === 0) return;
     const orderHeader = orderHeaderRes.recordset[0];
+
+    // Resolve extra charge if not yet stored on orderHeader
+    let extraCharge = Number(passedExtraCharge || orderHeader.PaymodeServiceCharge || 0);
+    if (extraCharge === 0 && paymentMode) {
+      try {
+        const pmCheck = await pool.request()
+          .input("pm", sql.NVarChar(50), String(paymentMode).trim())
+          .query(`SELECT TOP 1 ExtraCharges FROM PAYMODE WHERE UPPER(LTRIM(RTRIM(PayMode))) = UPPER(LTRIM(RTRIM(@pm)))`);
+        if (pmCheck.recordset.length > 0 && pmCheck.recordset[0].ExtraCharges > 0) {
+          extraCharge = Number(pmCheck.recordset[0].ExtraCharges);
+        }
+      } catch (e) { }
+    }
 
     // 2. Get Items (Primary: RestaurantOrderDetailCur, Fallback: SettlementItemDetail)
     let itemsRes = await pool.request()
@@ -683,7 +705,7 @@ async function generateAndQueueReceipt(orderId, paymentMode = 'ONLINE') {
 
     // 6. Calculate Subtotal and Format Thermal Text
     const calculatedSubtotal = items.reduce((s, i) => s + Number(i.price || 0) * Number(i.qty || 1), 0);
-    const displayTotal = Number(orderHeader.TotalAmount) > 0 ? Number(orderHeader.TotalAmount) : calculatedSubtotal;
+    const displayTotal = Number(orderHeader.TotalAmount) > 0 ? Number(orderHeader.TotalAmount) : (calculatedSubtotal + extraCharge);
 
     const saleData = {
       tableNo: orderHeader.tableNo,
@@ -691,6 +713,7 @@ async function generateAndQueueReceipt(orderId, paymentMode = 'ONLINE') {
       items: items,
       subtotal: calculatedSubtotal,
       serviceCharge: Number(orderHeader.ServiceChargeAmount) || 0,
+      extraCharge: extraCharge,
       gst: Number(orderHeader.GstAmount) || 0,
       total: displayTotal,
       payMode: paymentMode,

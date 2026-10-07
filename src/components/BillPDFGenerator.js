@@ -685,6 +685,15 @@ class BillPDFGenerator {
              `
         : ""
       }
+             ${saleData.extraCharge || saleData.PaymodeServiceCharge
+        ? `
+             <div class="total-row">
+               <span>Extra Charge (${(saleData.paymentMethod || saleData.payMode || "Payment").toUpperCase()}):</span>
+               <span>+${currencySymbol}${parseFloat(saleData.extraCharge || saleData.PaymodeServiceCharge).toFixed(2)}</span>
+             </div>
+             `
+        : ""
+      }
              ${hasGST && gstAmount > 0
         ? `
              <div class="total-row">
