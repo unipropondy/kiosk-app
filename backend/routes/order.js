@@ -1491,12 +1491,14 @@ router.post("/mark-sent", async (req, res) => {
 
     const pool = await poolPromise;
 
+    // ✅ KOT for kitchen
     try {
       await generateAndQueueKOTs(orderId);
     } catch (err) {
       console.error("Failed to queue KOT for mark-sent:", err);
     }
 
+    // ✅ Receipt for Cash payment — called ONCE only here (not in complete-online-payment)
     try {
       await generateAndQueueReceipt(orderId, "CASH");
     } catch (err) {
@@ -2032,21 +2034,15 @@ router.post("/complete-online-payment", async (req, res) => {
     }
 
     try {
-      // Queue KOT print for kitchen
+      // ✅ Queue KOT once using OrderNumber only (guidOrderId is an internal DB GUID — not needed here)
       await generateAndQueueKOTs(orderId);
-      if (guidOrderId && guidOrderId !== orderId) {
-        await generateAndQueueKOTs(guidOrderId).catch(() => {});
-      }
     } catch (err) {
       console.error("Failed to queue KOT for online payment:", err);
     }
 
     try {
-      // Queue checkout receipt for online payments
+      // ✅ Queue receipt once using OrderNumber only
       await generateAndQueueReceipt(orderId, pMethod);
-      if (guidOrderId && guidOrderId !== orderId) {
-        await generateAndQueueReceipt(guidOrderId, pMethod).catch(() => {});
-      }
     } catch (err) {
       console.error("Failed to queue receipt:", err);
     }

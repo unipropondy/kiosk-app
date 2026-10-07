@@ -1244,27 +1244,9 @@ function App() {
         return;
       }
 
-      // ✅ Trigger Customer Print Flow (matching payment_success.tsx in POS app)
-      try {
-        const saleData = {
-          invoiceNumber: data.orderId || posOrderId,
-          orderNo: data.orderId || posOrderId,
-          tableNo: tableNo || "TAKEAWAY",
-          total: parseFloat(amount) || 0,
-          paymentMethod: "ONLINE",
-          items: (cart || []).map(i => ({
-            name: i.name || i.Name || i.DishName || "Item",
-            qty: i.qty || i.Quantity || 1,
-            price: Number(i.price || i.Price || 0),
-            modifiers: i.selectedMods || i.modifiers || [],
-            comboSelections: i.comboSelections || []
-          })),
-          date: new Date()
-        };
-        UniversalPrinter.smartPrint(saleData, "1");
-      } catch (printErr) {
-        console.warn("Client-side customer receipt print error:", printErr);
-      }
+      // ✅ Receipt is now printed server-side via generateAndQueueReceipt() in complete-online-payment.
+      // DO NOT call UniversalPrinter.smartPrint() here — it causes duplicate/triple printing.
+      console.log("[completeOrder] Receipt queued server-side for order:", data.orderId || posOrderId);
 
       setCart([]);
       setPaymentDone(true);
@@ -2190,30 +2172,38 @@ function App() {
 
                 {/* Order Number Circle */}
                 <div style={{
-                  width: 'clamp(180px, 35vw, 280px)',
-                  height: 'clamp(180px, 35vw, 280px)',
+                  width: 'clamp(210px, 32vw, 300px)',
+                  height: 'clamp(210px, 32vw, 300px)',
                   borderRadius: '50%',
-                  background: 'rgba(255,255,255,0.92)',
+                  background: 'rgba(255,255,255,0.95)',
                   display: 'flex', flexDirection: 'column',
+                  flexWrap: 'nowrap',
                   alignItems: 'center', justifyContent: 'center',
-                  boxShadow: '0 12px 48px rgba(0,0,0,0.18)',
-                  gap: '4px'
+                  boxShadow: '0 14px 48px rgba(0,0,0,0.18)',
+                  gap: '6px',
+                  padding: '24px',
+                  boxSizing: 'border-box'
                 }}>
                   <div style={{
-                    fontSize: 'clamp(14px, 2.5vw, 20px)',
+                    fontSize: 'clamp(12px, 1.8vw, 18px)',
                     color: '#ea580c',
-                    fontWeight: '700',
-                    letterSpacing: '0.5px',
-                    textTransform: 'uppercase'
+                    fontWeight: '800',
+                    letterSpacing: '0.8px',
+                    textTransform: 'uppercase',
+                    whiteSpace: 'nowrap'
                   }}>
                     Your order no.
                   </div>
                   <div style={{
-                    fontSize: 'clamp(64px, 14vw, 110px)',
-                    fontWeight: '500',
+                    fontSize: 'clamp(36px, 7vw, 72px)',
+                    fontWeight: '900',
                     color: '#ea580c',
                     lineHeight: 1,
-                    letterSpacing: '-2px'
+                    letterSpacing: '-1px',
+                    whiteSpace: 'nowrap',
+                    maxWidth: '92%',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
                   }}>
                     {String(kioskThankYouOrderId).replace(/\D/g, '').slice(-4) || kioskThankYouOrderId}
                   </div>
