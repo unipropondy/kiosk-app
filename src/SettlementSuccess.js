@@ -166,7 +166,9 @@ function SettlementSuccess() {
     loadOrderItems();
   };
 
-  const orderSuffix = orderNumber || "----";
+  const orderSuffix = orderNumber
+    ? (String(orderNumber).replace(/\D/g, '').slice(-4) || orderNumber)
+    : "----";
   const activeStep = getActiveStep(statusCode);
   const currentStatus = STATUS_STEPS[activeStep];
 

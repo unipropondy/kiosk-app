@@ -504,7 +504,8 @@ async function syncTableStatus(req, tableId) {
 router.get("/kiosk/tables", async (req, res) => {
   try {
     const pool = await poolPromise;
-    const result = await pool.request().query(`
+    // First, try finding an unassigned table in sections 1, 2, 3
+    let result = await pool.request().query(`
       SELECT TOP 1 TableId, TableNumber AS TableNo
       FROM TableMaster
       WHERE CurrentOrderId IS NULL
@@ -512,6 +513,26 @@ router.get("/kiosk/tables", async (req, res) => {
         AND ISNULL(Status, 0) = 0
       ORDER BY SortCode ASC
     `);
+
+    // Fallback 1: Any table where CurrentOrderId is NULL or Status is 0
+    if (!result.recordset || result.recordset.length === 0) {
+      result = await pool.request().query(`
+        SELECT TOP 1 TableId, TableNumber AS TableNo
+        FROM TableMaster
+        WHERE CurrentOrderId IS NULL OR ISNULL(Status, 0) = 0
+        ORDER BY SortCode ASC
+      `);
+    }
+
+    // Fallback 2: Any table at all in TableMaster
+    if (!result.recordset || result.recordset.length === 0) {
+      result = await pool.request().query(`
+        SELECT TOP 1 TableId, TableNumber AS TableNo
+        FROM TableMaster
+        ORDER BY TableId ASC
+      `);
+    }
+
     res.json({ success: true, tables: result.recordset });
   } catch (err) {
     console.error("[Kiosk] /kiosk/tables ERROR:", err.message);
@@ -521,7 +542,8 @@ router.get("/kiosk/tables", async (req, res) => {
 
 router.post("/kiosk/start", async (req, res) => {
   try {
-    const orderNumber = String(Date.now()).slice(-8);
+    const { tableId } = req.body;
+    const orderNumber = await getOrGenerateOrderId(req, tableId || "TAKEAWAY");
     res.json({ success: true, orderNumber });
   } catch (err) {
     console.error("[Kiosk] /kiosk/start ERROR:", err.message);
@@ -1953,7 +1975,7 @@ router.post("/complete-online-payment", async (req, res) => {
                 )
                 SELECT 
                     d.OrderDetailId, d.OrderId, d.DishId, d.Description, d.DishName, d.Quantity, 
-                    d.PricePerUnit, d.ActualAmount, d.TotalDetailLineAmount, 3, 
+                    d.PricePerUnit, d.ActualAmount, d.TotalDetailLineAmount, 2, 
                     d.CreatedBy, d.CreatedOn, d.BusinessUnitId, d.OrderDateTime
                 FROM RestaurantOrderDetailCur d
                 WHERE d.OrderId = (SELECT OrderId FROM RestaurantOrderCur WHERE OrderNumber = @orderNo)
@@ -1961,80 +1983,11 @@ router.post("/complete-online-payment", async (req, res) => {
                       SELECT 1 FROM RestaurantOrderDetail rd WHERE rd.OrderDetailId = d.OrderDetailId
                   );
             `);
-    console.log(`✅ [PAYMENT] Order archived`);
-
     await transaction.commit();
-    console.log(`✅ [PAYMENT] ✅✅✅ ALL COMPLETE for order ${orderId}`);
-
-    // ── POST-PAYMENT: UPSERT kioskCustomer ────────────────────────────────────
-    // Only runs if this was a kiosk order with a car number provided.
-    // Retrieves the first DishId from SettlementItemDetail and saves/updates the customer record.
-    if (kioskCarNumber && kioskCarNumber.trim()) {
-      try {
-        const trimmedCarNumber = kioskCarNumber.trim().toUpperCase();
-        const trimmedCustomerName = (kioskCustomerName || "").trim();
-
-        // Get the first DishId from the SettlementItemDetail just inserted
-        const dishRes = await pool.request()
-          .input("sid", sql.UniqueIdentifier, settlementId)
-          .query(`
-            SELECT TOP 1 DishId
-            FROM SettlementItemDetail
-            WHERE SettlementID = @sid
-              AND DishId IS NOT NULL
-            ORDER BY OrderDateTime ASC
-          `);
-        const defaultDishId = dishRes.recordset[0]?.DishId || null;
-
-        // Check if customer already exists (by CarNumber)
-        const existingRes = await pool.request()
-          .input("CarNumber", sql.NVarChar(50), trimmedCarNumber)
-          .query(`
-            SELECT TOP 1 CustomerVehicleId
-            FROM kioskCustomer
-            WHERE CarNumber = @CarNumber AND IsActive = 1
-          `);
-
-        if (existingRes.recordset.length > 0) {
-          // UPDATE existing customer: refresh name and DefaultDishId
-          const existingId = existingRes.recordset[0].CustomerVehicleId;
-          await pool.request()
-            .input("CustomerVehicleId", sql.UniqueIdentifier, existingId)
-            .input("CustomerName", sql.NVarChar(100), trimmedCustomerName || null)
-            .input("DefaultDishId", sql.UniqueIdentifier, defaultDishId)
-            .query(`
-              UPDATE kioskCustomer
-              SET
-                CustomerName = COALESCE(@CustomerName, CustomerName),
-                DefaultDishId = COALESCE(@DefaultDishId, DefaultDishId),
-                ModifiedOn = GETDATE()
-              WHERE CustomerVehicleId = @CustomerVehicleId
-            `);
-          console.log(`✅ [KIOSK CUSTOMER] Updated existing customer: ${trimmedCarNumber}`);
-        } else {
-          // INSERT new customer record
-          const newId = crypto.randomUUID();
-          await pool.request()
-            .input("CustomerVehicleId", sql.UniqueIdentifier, newId)
-            .input("CustomerName", sql.NVarChar(100), trimmedCustomerName || "Guest")
-            .input("CarNumber", sql.NVarChar(50), trimmedCarNumber)
-            .input("DefaultDishId", sql.UniqueIdentifier, defaultDishId)
-            .query(`
-              INSERT INTO kioskCustomer
-                (CustomerVehicleId, CustomerName, CarNumber, DefaultDishId, IsActive, CreatedOn)
-              VALUES
-                (@CustomerVehicleId, @CustomerName, @CarNumber, @DefaultDishId, 1, GETDATE())
-            `);
-          console.log(`✅ [KIOSK CUSTOMER] Inserted new customer: ${trimmedCarNumber}`);
-        }
-      } catch (custErr) {
-        // Non-fatal: log but do not fail the payment response
-        console.error("⚠️ [KIOSK CUSTOMER] Failed to upsert kioskCustomer:", custErr.message);
-      }
-    }
+    console.log(`✅ [PAYMENT] Transaction committed for order ${orderId}`);
 
     try {
-      // ✅ Queue KOT once using OrderNumber only (guidOrderId is an internal DB GUID — not needed here)
+      // ✅ Queue KOT once using OrderNumber only
       await generateAndQueueKOTs(orderId);
     } catch (err) {
       console.error("Failed to queue KOT for online payment:", err);
@@ -2046,6 +1999,8 @@ router.post("/complete-online-payment", async (req, res) => {
     } catch (err) {
       console.error("Failed to queue receipt:", err);
     }
+
+    console.log(`✅ [PAYMENT] ✅✅✅ ALL COMPLETE for order ${orderId}`);
 
     const io = req.io || req.app?.get("io");
     if (io) {

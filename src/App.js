@@ -1215,9 +1215,9 @@ function App() {
   //     }
   // };
 
-  const completeOrder = async (posOrderId, amount) => {
+  const completeOrder = async (posOrderId, amount, payMethod = "ONLINE") => {
     try {
-      console.log("[completeOrder] Using POS orderId:", posOrderId, "Amount:", amount);
+      console.log("[completeOrder] Using POS orderId:", posOrderId, "Amount:", amount, "PayMethod:", payMethod);
       const promoAmount = Number(localStorage.getItem("promoAmount") || 0);
       const res = await fetch(`${API}/order/complete-online-payment`, {
         method: "POST",
@@ -1230,7 +1230,7 @@ function App() {
           kioskCarNumber: isKiosk ? (localStorage.getItem("kioskCarNumber") || undefined) : undefined,
           kioskCustomerName: isKiosk ? (localStorage.getItem("kioskCustomerName") || undefined) : undefined,
           totalAmount: parseFloat(amount),
-          paymentMethod: "ONLINE",
+          paymentMethod: payMethod,
           promoAmount,
           cart: cart
         })
@@ -1376,6 +1376,27 @@ function App() {
                 }
                 return item;
               });
+
+              // Merge any server items that aren't in local cart yet
+              const existingIds = new Set(updatedCart.map(i => i.OrderDetailId || i.lineItemId).filter(Boolean));
+              const missingServerItems = cartData.items.filter(b => (b.OrderDetailId || b.lineItemId) && !existingIds.has(b.OrderDetailId || b.lineItemId));
+              
+              if (missingServerItems.length > 0) {
+                changed = true;
+                const formattedMissing = missingServerItems.map(m => ({
+                  ...m,
+                  id: m.DishId || m.id,
+                  name: m.DishName || m.name,
+                  price: Number(m.Price || m.price || 0),
+                  Price: Number(m.Price || m.price || 0),
+                  qty: Number(m.qty || m.Quantity || 1),
+                  OrderDetailId: m.OrderDetailId || m.lineItemId,
+                  lineItemId: m.OrderDetailId || m.lineItemId,
+                  status: "SENT"
+                }));
+                return [...updatedCart, ...formattedMissing];
+              }
+
               if (changed) { skipSaveRef.current = true; return updatedCart; }
               return prev;
             });
@@ -3050,40 +3071,9 @@ function App() {
 
                     {/* Card 3: Cash */}
                     <div className="payment-mode-card paynow-card" style={{ borderColor: '#16a34a', background: '#f0fdf4' }} onClick={async () => {
-                      const finalOrderId = currentOrderIdRef.current || currentOrderId;
-                      try {
-                        await fetch(`${API}/order/mark-sent`, {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ orderId: finalOrderId })
-                        });
-
-                        await fetch(`${API}/order/payment-status`, {
-                          method: "POST",
-                          headers: {
-                            "Content-Type": "application/json"
-                          },
-                          body: JSON.stringify({
-                            tableId: tableId,
-                            paymentStatus: 0
-                          })
-                        });
-
-                      } catch (e) {
-                        console.error(e);
-                      }
+                      const finalOrderId = currentOrderIdRef.current || currentOrderId || localStorage.getItem("kioskOrderId");
                       setShowPaymentPopup(false);
-
-                      const isKioskPayment = isKiosk || Boolean(localStorage.getItem("kioskOrderType"));
-                      if (isKioskPayment) {
-                        showKioskThankYouThen(
-                          finalOrderId,
-                          `/settlement-success?kiosk=1&tableId=${encodeURIComponent(tableId)}&table=${encodeURIComponent(tableNo)}&orderId=${encodeURIComponent(finalOrderId)}`
-                        );
-                      } else {
-                        window.location.href = `/settlement-success?tableId=${tableId}&table=${tableNo}&orderId=${finalOrderId}`;
-                      }
-
+                      completeOrder(finalOrderId, totalAmount, "CASH");
                     }}>
                       <div className="payment-mode-icons" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '110px' }}>
                         <CashBrand />
@@ -3251,86 +3241,9 @@ function App() {
                   //   setShowOnlinePayment(false);
                   //   handlePaymentSuccess("Online Payment Successful!");
                   // }}
-                  onClick={async () => {
-
-                    try {
-                      console.log("CURRENT ORDER ID:", currentOrderId);
-                      const res = await fetch(`${API}/sales/save`, {
-                        method: "POST",
-                        headers: {
-                          "Content-Type": "application/json",
-                        },
-                        body: JSON.stringify({
-
-                          orderId:
-                            currentOrderId &&
-                              currentOrderId !== "null"
-                              ? currentOrderId
-                              : "00000000-0000-0000-0000-000000000000",
-
-                          tableNo: tableNo,
-
-                          tableId: tableId,
-
-                          subTotal: Number(totalAmount),
-
-
-                          totalAmount: Number(totalAmount),
-
-                          paymentMethod: "PAYNOW",
-
-                          items: cart.map((item) => ({
-
-                            id: item.DishId || item.id,
-
-                            name: item.Name || item.name,
-
-                            qty: Number(item.qty || 1),
-
-                            price: Number(item.Price || item.price || 0),
-
-                          })),
-
-                        }),
-                      });
-
-                      const data = await res.json();
-
-                      console.log("PAYMENT PROCESS:", data);
-
-                      if (data.success) {
-
+                  onClick={() => {
                     setShowOnlinePayment(false);
-
-                    handlePaymentSuccess(
-                      `Payment Successful! TXN: ${data.transactionId}`
-                    );
-
-                    // KOT PRINT is now handled by backend
-
-
-                    // ✅ Open SettlementSuccess Screen
-                    setTimeout(() => {
-
-                      window.location.href =
-                        `/settlement-success?tableId=${tableId}&table=${tableNo}&orderId=${currentOrderId}`;
-
-                    }, 1000);
-
-                  } else {
-
-                    alert(data.error || "Payment Failed");
-
-                  }
-
-                    } catch (err) {
-
-                      console.log("PAYMENT ERROR:", err);
-
-                      alert("Server Error");
-
-                    }
-
+                    completeOrder(currentOrderId, totalAmount);
                   }}
                 >
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>

@@ -52,16 +52,14 @@ function formatThermalTextWithDiscount(saleData, company, discountInfo) {
 
   // ── Bill Info ─────────────────────────────────────────────────────────────
   if (orderNo) {
-    const last4 = String(orderNo).slice(-4);
+    const last4 = String(orderNo).replace(/\D/g, '').slice(-4) || orderNo;
     text += `[L]<font size='big'><B>Order No: ${last4}</B></font>\n`;
   }
   if (tableNo) {
-    if (tableNo === "KIOSK-IN") {
-      text += `[L]<B>Eat In : KIOSK</B>\n`;
-    } else if (tableNo === "KIOSK") {
-      text += `[L]<B>Takeaway : KIOSK</B>\n`;
+    if (tableNo === "KIOSK-IN" || tableNo === "KIOSK" || tableNo === "TAKEAWAY") {
+      text += `[L]<B>ORDER TYPE: KIOSK</B>\n`;
     } else {
-      text += `[L]<B>TAKEAWAY: ${tableNo}</B>\n`;
+      text += `[L]<B>KIOSK: ${tableNo}</B>\n`;
     }
   }
   text += `[L]Date: ${dateStr} ${timeStr}\n`;
@@ -188,12 +186,10 @@ function formatKOTThermalText(data, itemsForPrinter, type) {
   let text = `[C]<B>${title}</B>\n`;
   text += `[C]${kotDateStr} ${kotTimeStr}\n`;
   text += "[L]--------------------------------\n";
-  if (tableNo === "KIOSK-IN") {
-    text += `[C]<font size='big'>Eat In : KIOSK</font>\n`;
-  } else if (tableNo === "KIOSK") {
-    text += `[C]<font size='big'>Takeaway : KIOSK</font>\n`;
+  if (tableNo === "KIOSK-IN" || tableNo === "KIOSK" || tableNo === "TAKEAWAY") {
+    text += `[C]<font size='big'>ORDER TYPE: KIOSK</font>\n`;
   } else {
-    text += `[C]<font size='big'>Takeaway: ${tableNo}</font>\n`;
+    text += `[C]<font size='big'>KIOSK: ${tableNo}</font>\n`;
   }
   text += "[L]--------------------------------\n";
   text += "[L]QTY  ITEM\n";
@@ -280,8 +276,9 @@ function formatKOTThermalText(data, itemsForPrinter, type) {
     text += "[L]--------------------------------\n";
   }
 
+  const orderNoLast4 = String(orderNo).replace(/\D/g, '').slice(-4) || orderNo;
   text += `[L]Order By: ${waiter}\n`;
-  text += `[L]Order #: <font size='big'><B>${orderNo}</B></font>\n`;
+  text += `[L]Order #: <font size='big'><B>${orderNoLast4}</B></font>\n`;
 
   if (kitchenName && kitchenName !== "KDS") {
     text += "[L]--------------------------------\n";
@@ -439,9 +436,10 @@ async function generateAndQueueKOTs(orderId) {
           kitchenName: group.printerName
         };
 
+        const orderNoLast4 = String(orderHeader.OrderNumber).replace(/\D/g, '').slice(-4) || orderHeader.OrderNumber;
         const dupCheck = await pool.request()
           .input('PrinterName', sql.NVarChar(100), group.printerName)
-          .input('SearchText', sql.NVarChar(100), `%Order #: ${orderHeader.OrderNumber}%`)
+          .input('SearchText', sql.NVarChar(100), `%Order #: ${orderNoLast4}%`)
           .query(`
             SELECT JobId, Status 
             FROM PrintJobQueue 
@@ -503,9 +501,10 @@ async function generateAndQueueKOTs(orderId) {
           kitchenName: "KDS"
         };
 
+        const kdsOrderNoLast4 = String(orderHeader.OrderNumber).replace(/\D/g, '').slice(-4) || orderHeader.OrderNumber;
         const kdsDupCheck = await pool.request()
           .input('PrinterName', sql.NVarChar(100), kdsPrinter.PrinterName)
-          .input('SearchText', sql.NVarChar(100), `%Order #: ${orderHeader.OrderNumber}%`)
+          .input('SearchText', sql.NVarChar(100), `%Order #: ${kdsOrderNoLast4}%`)
           .query(`
             SELECT TOP 1 JobId 
             FROM PrintJobQueue 
