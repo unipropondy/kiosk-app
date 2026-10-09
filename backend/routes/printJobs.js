@@ -6,7 +6,7 @@ const { poolPromise, sql } = require('../config/db');
 const authenticateBridge = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
-  const storeId = req.headers['x-store-id'] || req.query.storeId || req.body.storeId;
+  const storeId = req.headers['x-store-id'] || req.query.storeId || (req.body && req.body.storeId);
 
   const expectedToken = process.env.BRIDGE_TOKEN || 'unipro-pos-bridge-token-2026';
 
@@ -74,7 +74,15 @@ router.get('/pending', authenticateBridge, async (req, res) => {
       .query(`
         SELECT JobId, StoreId, PrinterName, PrinterIp, PrinterPort, Content, Status, Attempts
         FROM PrintJobQueue
-        WHERE (StoreId = @StoreId OR StoreId = 'STORE_001' OR StoreId = '1') AND Status = 'PENDING'
+        WHERE (StoreId = @StoreId OR StoreId = 'STORE_001' OR StoreId = '1') 
+          AND (
+            (Status = 'PENDING' AND (
+              Attempts = 0 
+              OR (Attempts = 1 AND DATEDIFF(second, ProcessedOn, GETDATE()) >= 3)
+              OR (Attempts = 2 AND DATEDIFF(second, ProcessedOn, GETDATE()) >= 6)
+            ))
+            OR (Status = 'PROCESSING' AND DATEDIFF(minute, ProcessedOn, GETDATE()) >= 2 AND Attempts < 3)
+          )
         ORDER BY CreatedOn ASC
       `);
 
