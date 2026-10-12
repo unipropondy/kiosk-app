@@ -2002,6 +2002,57 @@ router.post("/complete-online-payment", async (req, res) => {
     await transaction.commit();
     console.log(`✅ [PAYMENT] Transaction committed for order ${orderId}`);
 
+    // ── KIOSK CUSTOMER: SAVE / UPDATE DEFAULT DISH ID AFTER PAYMENT ──
+    if (kioskCarNumber && String(kioskCarNumber).trim()) {
+      try {
+        const cleanCar = String(kioskCarNumber).trim().toUpperCase();
+        const cleanName = (kioskCustomerName && String(kioskCustomerName).trim()) || "Guest";
+        const dishIdToSave = req.body.defaultDishId || (cart && cart.length > 0 ? (cart[0].DishId || cart[0].id) : null);
+
+        if (dishIdToSave) {
+          const custCheck = await pool.request()
+            .input("carNo", sql.NVarChar(50), cleanCar)
+            .query(`
+              SELECT TOP 1 CustomerVehicleId, CarNumber, CustomerName
+              FROM kioskCustomer
+              WHERE UPPER(LTRIM(RTRIM(CarNumber))) = @carNo
+            `);
+
+          if (custCheck.recordset.length > 0) {
+            const existingVehId = custCheck.recordset[0].CustomerVehicleId;
+            await pool.request()
+              .input("vehId", sql.UniqueIdentifier, existingVehId)
+              .input("dishId", sql.NVarChar(100), String(dishIdToSave))
+              .input("custName", sql.NVarChar(150), cleanName)
+              .query(`
+                UPDATE kioskCustomer
+                SET DefaultDishId = @dishId,
+                    CustomerName = COALESCE(@custName, CustomerName),
+                    UpdatedOn = GETDATE(),
+                    IsActive = 1
+                WHERE CustomerVehicleId = @vehId
+              `);
+            console.log(`✅ [PAYMENT] Updated kioskCustomer ${cleanCar} with DefaultDishId: ${dishIdToSave}`);
+          } else {
+            await pool.request()
+              .input("carNo", sql.NVarChar(50), cleanCar)
+              .input("custName", sql.NVarChar(150), cleanName)
+              .input("dishId", sql.NVarChar(100), String(dishIdToSave))
+              .query(`
+                INSERT INTO kioskCustomer (
+                  CustomerVehicleId, CustomerName, CarNumber, DefaultDishId, IsActive, CreatedOn
+                ) VALUES (
+                  NEWID(), @custName, @carNo, @dishId, 1, GETDATE()
+                )
+              `);
+            console.log(`✅ [PAYMENT] Inserted new kioskCustomer ${cleanCar} with DefaultDishId: ${dishIdToSave}`);
+          }
+        }
+      } catch (kioskCustErr) {
+        console.error("⚠️ Failed to save/update kioskCustomer after payment:", kioskCustErr.message);
+      }
+    }
+
     try {
       // ✅ Queue KOT once using OrderNumber only
       await generateAndQueueKOTs(orderId);
@@ -2173,7 +2224,6 @@ router.get("/kiosk/customers", async (req, res) => {
 
   } catch (error) {
     console.error("Kiosk customers search error:", error);
-
     return res.status(500).json({
       success: false,
       error: "Unable to load customers."
@@ -2181,6 +2231,108 @@ router.get("/kiosk/customers", async (req, res) => {
   }
 });
 
+router.post("/kiosk/customer/save", async (req, res) => {
+  try {
+    const {
+      customerVehicleId,
+      carNumber,
+      customerName,
+      defaultDishId,
+      mobileNumber,
+      vehicleType
+    } = req.body;
+
+    if (!carNumber || !String(carNumber).trim()) {
+      return res.status(400).json({ success: false, error: "CarNumber is required" });
+    }
+
+    const cleanCar = String(carNumber).trim().toUpperCase();
+    const cleanName = (customerName && String(customerName).trim()) || "Guest";
+    const cleanDishId = defaultDishId ? String(defaultDishId).trim() : null;
+    const pool = await poolPromise;
+
+    // Search existing by CustomerVehicleId or CarNumber
+    let checkQuery = pool.request()
+      .input("CarNumber", sql.NVarChar(50), cleanCar);
+
+    let whereSql = "WHERE UPPER(LTRIM(RTRIM(CarNumber))) = @CarNumber";
+    if (customerVehicleId) {
+      checkQuery = checkQuery.input("CustVehId", sql.NVarChar(100), String(customerVehicleId).trim());
+      whereSql = "WHERE CustomerVehicleId = @CustVehId OR UPPER(LTRIM(RTRIM(CarNumber))) = @CarNumber";
+    }
+
+    const checkRes = await checkQuery.query(`
+      SELECT TOP 1 CustomerVehicleId, CustomerName, CarNumber, DefaultDishId
+      FROM kioskCustomer
+      ${whereSql}
+    `);
+
+    let finalVehicleId = null;
+
+    if (checkRes.recordset.length > 0) {
+      finalVehicleId = checkRes.recordset[0].CustomerVehicleId;
+      await pool.request()
+        .input("CustVehId", sql.UniqueIdentifier, finalVehicleId)
+        .input("CustomerName", sql.NVarChar(150), cleanName)
+        .input("DefaultDishId", sql.NVarChar(100), cleanDishId || checkRes.recordset[0].DefaultDishId)
+        .input("MobileNumber", sql.NVarChar(50), mobileNumber || null)
+        .input("VehicleType", sql.NVarChar(50), vehicleType || null)
+        .query(`
+          UPDATE kioskCustomer
+          SET DefaultDishId = COALESCE(@DefaultDishId, DefaultDishId),
+              CustomerName = COALESCE(@CustomerName, CustomerName),
+              MobileNumber = COALESCE(@MobileNumber, MobileNumber),
+              VehicleType = COALESCE(@VehicleType, VehicleType),
+              IsActive = 1,
+              UpdatedOn = GETDATE()
+          WHERE CustomerVehicleId = @CustVehId
+        `);
+
+      console.log(`[kioskCustomer] Updated customer ${cleanCar} with DefaultDishId: ${cleanDishId}`);
+      return res.json({
+        success: true,
+        action: "updated",
+        customerVehicleId: finalVehicleId,
+        defaultDishId: cleanDishId,
+        message: "Customer updated successfully"
+      });
+    } else {
+      const insertRes = await pool.request()
+        .input("CustomerName", sql.NVarChar(150), cleanName)
+        .input("CarNumber", sql.NVarChar(50), cleanCar)
+        .input("DefaultDishId", sql.NVarChar(100), cleanDishId)
+        .input("MobileNumber", sql.NVarChar(50), mobileNumber || null)
+        .input("VehicleType", sql.NVarChar(50), vehicleType || null)
+        .query(`
+          DECLARE @NewId UNIQUEIDENTIFIER = NEWID();
+          INSERT INTO kioskCustomer (
+            CustomerVehicleId, CustomerName, CarNumber, MobileNumber, VehicleType,
+            DefaultDishId, IsActive, CreatedOn
+          ) VALUES (
+            @NewId, @CustomerName, @CarNumber, @MobileNumber, @VehicleType,
+            @DefaultDishId, 1, GETDATE()
+          );
+          SELECT @NewId AS CustomerVehicleId;
+        `);
+
+      finalVehicleId = insertRes.recordset[0]?.CustomerVehicleId;
+      console.log(`[kioskCustomer] Inserted customer ${cleanCar} with DefaultDishId: ${cleanDishId}`);
+      return res.json({
+        success: true,
+        action: "inserted",
+        customerVehicleId: finalVehicleId,
+        defaultDishId: cleanDishId,
+        message: "New customer created successfully"
+      });
+    }
+  } catch (error) {
+    console.error("Save kiosk customer error:", error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || "Unable to save customer."
+    });
+  }
+});
 
 module.exports = router;
 
